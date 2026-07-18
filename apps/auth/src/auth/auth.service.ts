@@ -1,6 +1,6 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { JwtPayload, Role } from '@minedu/common';
+import { EVENTS, JwtPayload, RedisPubSubService, Role } from '@minedu/common';
 import * as bcrypt from 'bcryptjs';
 import { AuthUser } from '../../generated/prisma';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,10 +9,13 @@ import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly usersClient: UsersClientService,
+    private readonly redisPubSub: RedisPubSubService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -36,6 +39,17 @@ export class AuthService {
       fullName: dto.fullName,
       role: dto.role,
     });
+
+    try {
+      await this.redisPubSub.publish(EVENTS.USER_CREATED, {
+        authUserId: authUser.id,
+        email: authUser.email,
+        fullName: dto.fullName,
+        role: dto.role,
+      });
+    } catch (error) {
+      this.logger.warn(`No se pudo publicar ${EVENTS.USER_CREATED}: ${(error as Error).message}`);
+    }
 
     return this.buildAuthResponse(authUser);
   }

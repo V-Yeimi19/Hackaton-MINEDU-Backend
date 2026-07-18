@@ -10,8 +10,15 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { CurrentUser, JwtAuthGuard, JwtPayload, Role, Roles, RolesGuard } from '@minedu/common';
-import { InternalKeyGuard } from '../common/guards/internal-key.guard';
+import {
+  CurrentUser,
+  InternalKeyGuard,
+  JwtAuthGuard,
+  JwtPayload,
+  Role,
+  Roles,
+  RolesGuard,
+} from '@minedu/common';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
 import { UpdateUserDto } from './dto/update-user.dto';

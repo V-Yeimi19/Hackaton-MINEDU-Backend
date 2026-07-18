@@ -2,7 +2,7 @@
 
 Monorepo de microservicios NestJS, dividido por **capas de responsabilidad** entre 2 desarrolladores (no por microservicio), para minimizar bloqueos durante el hackathon.
 
-- **Desarrollador A**: Gateway, Auth, Users, Storage, Notifications, Reports, Docker, seguridad. Ya implementado: Gateway, Auth, Users, docker-compose completo.
+- **Desarrollador A**: Gateway, Auth, Users, Storage, Notifications, Reports, Docker, seguridad. Ya implementado (Semana 1 y 2): Gateway (proxy + rate limit + JWT check), Auth, Users, Storage (MinIO), Notifications (BullMQ + WebSocket + eventos), docker-compose completo. Pendiente: Reports (Semana 3).
 - **Desarrollador B**: Classroom, Analytics (Gemelo Digital), AI, Accessibility. Hoy son stubs de health-check en `apps/{classroom,analytics,ai,accessibility}` — B reemplaza el contenido sin tocar Gateway ni docker-compose.
 
 ## Estructura
@@ -33,11 +33,18 @@ Sin esto, dos servicios que comparten la misma versión de `@prisma/client` en e
 ### `@minedu/common`
 Contiene `Role`, `JwtPayload`, `JwtAuthGuard`, `JwtStrategy`, `RolesGuard` + `@Roles()`, `@CurrentUser()`, `HttpExceptionFilter`, `PaginationDto`. Se resuelve como paquete normal de node_modules (dist compilado), **no** vía `tsconfig paths` a los fuentes — eso se intentó y rompía el build (`nest build` usa `tsc`, que intenta emitir cualquier `.ts` incluido vía path mapping, violando `rootDir`). Consecuencia práctica: **después de tocar `packages/common/src`, hay que correr `pnpm --filter @minedu/common build` antes de que los demás servicios vean el cambio** (dev o build).
 
-### JWT validado en cada servicio, no solo en el Gateway
-Cada servicio que necesita auth importa `JwtStrategy`/`JwtAuthGuard` de `@minedu/common` y registra `PassportModule` + el strategy como provider (ver `apps/users/src/auth/auth.module.ts` para el patrón mínimo). Todos comparten el mismo `JWT_SECRET` por env. Validación centralizada en el Gateway es trabajo de Semana 2, no está implementado.
+### JWT validado en el Gateway Y en cada servicio (defensa en profundidad)
+El Gateway verifica el JWT (con `jsonwebtoken`, no Passport) antes de proxyar cualquier prefijo que no esté marcado `public: true` en `apps/gateway/src/config/services.config.ts` (hoy solo `auth` es público) — rechaza con 401 sin llegar al servicio si falta o es inválido. **Pero cada servicio sigue validando el JWT de forma independiente** con `JwtStrategy`/`JwtAuthGuard` de `@minedu/common` (`PassportModule` + el strategy como provider, ver `apps/users/src/auth/auth.module.ts`) — no confíes solo en el Gateway. Todos comparten el mismo `JWT_SECRET` por env. El Gateway reenvía `x-user-id`/`x-user-email`/`x-user-role` como headers de conveniencia (no se usan todavía downstream); por seguridad, el Gateway los limpia de cualquier request entrante antes de fijarlos él mismo (`stripForwardedIdentityHeaders`), para que un cliente no pueda falsificarlos en rutas públicas.
 
 ### Llamadas internas entre servicios
-Se protegen con un guard local (`InternalKeyGuard` en Users) que compara el header `x-internal-key` contra `INTERNAL_API_KEY`. Patrón a repetir si un servicio nuevo necesita ser llamado internamente por otro (ej. Classroom llamando a Notifications).
+Se protegen con `InternalKeyGuard` (en `@minedu/common`) que compara el header `x-internal-key` contra `INTERNAL_API_KEY`. Ya usado en Users (`POST /internal`, llamado por Auth) y Notifications (`POST /internal`, para que cualquier servicio dispare una notificación). Reusar el mismo guard para nuevos endpoints internos, no duplicarlo.
+
+### Eventos entre servicios (Redis Pub/Sub) y colas (BullMQ)
+`@minedu/common` expone `RedisPubSubService` + `RedisPubSubModule` (importar una vez en `AppModule`, queda `@Global()`) y el catálogo `EVENTS` (`event-names.ts`) — hoy solo `EVENTS.USER_CREATED`. Patrón de referencia ya funcionando:
+- **Auth publica** `user.created` al registrar (`apps/auth/src/auth/auth.service.ts`), en un `try/catch` que no bloquea el registro si Redis falla.
+- **Notifications se suscribe** (`apps/notifications/src/events/events-subscriber.service.ts`) y encola una notificación de bienvenida vía BullMQ (`@nestjs/bullmq`, cola `notifications`), cuyo `NotificationsProcessor` persiste en Postgres y empuja por WebSocket (`NotificationsGateway`, namespace `/notifications`, autenticado con el JWT en `handshake.auth.token`).
+
+Para un evento nuevo (ej. `attendance.updated` de Classroom): agregar la constante a `EVENTS` en `@minedu/common`, publicar desde el servicio origen, suscribirse desde el/los servicios interesados en su `OnModuleInit`. El WebSocket de Notifications **no pasa por el Gateway** (el cliente se conecta directo a `NOTIFICATIONS_SERVICE_URL`); proxyar upgrade requests de WebSocket a través de `http-proxy-middleware` queda pendiente si se necesita.
 
 ### bcryptjs, no bcrypt
 `bcrypt` (nativo) falla al compilar su binding en este entorno (pnpm + Windows). Se usa `bcryptjs` (puro JS). No reintroducir `bcrypt`.
@@ -63,9 +70,15 @@ pnpm install
 docker compose up -d postgres redis minio
 pnpm --filter auth prisma:migrate
 pnpm --filter users prisma:migrate
-pnpm dev:gateway   # y dev:auth, dev:users en otras terminales
+pnpm --filter storage prisma:migrate
+pnpm --filter notifications prisma:migrate
+pnpm dev:gateway   # y dev:auth, dev:users, etc. en otras terminales
 ```
 
-Flujo de humo ya verificado funcionando: `POST /api/auth/register` → `POST /api/auth/login` → `GET /api/users/:id` con Bearer token (self-access ok, roles no autorizados dan 403, sin token da 401).
+Flujos de humo ya verificados funcionando:
+- `POST /api/auth/register` → `POST /api/auth/login` → `GET /api/users/:id` con Bearer token (self-access ok, roles no autorizados dan 403, sin token da 401 **del Gateway** antes de llegar a Users).
+- Registro dispara `user.created` → Notifications crea y persiste una notificación de bienvenida, visible en `GET /api/notifications` con el JWT del usuario recién creado.
+- Storage: `POST /api/storage/upload` (multipart) → `GET /api/storage/:id` (metadata) → `GET /api/storage/:id/download` (302 a URL prefirmada de MinIO) → `DELETE /api/storage/:id` → `GET` posterior da 404.
+- Rate limiter del Gateway responde con headers `RateLimit-*` en cada request.
 
 `docker compose up --build` completo (las 10 imágenes) no se pudo validar en el sandbox de este agente por una política de red del registry proxeado (`minimumReleaseAge`) — es una restricción del entorno del agente, no del código; probablemente no ocurra en una máquina normal.

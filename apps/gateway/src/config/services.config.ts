@@ -1,10 +1,11 @@
 export interface ServiceRoute {
   prefix: string;
   envKey: string;
+  public?: boolean;
 }
 
 export const serviceRoutes: ServiceRoute[] = [
-  { prefix: 'auth', envKey: 'AUTH_SERVICE_URL' },
+  { prefix: 'auth', envKey: 'AUTH_SERVICE_URL', public: true },
   { prefix: 'users', envKey: 'USERS_SERVICE_URL' },
   { prefix: 'storage', envKey: 'STORAGE_SERVICE_URL' },
   { prefix: 'notifications', envKey: 'NOTIFICATIONS_SERVICE_URL' },

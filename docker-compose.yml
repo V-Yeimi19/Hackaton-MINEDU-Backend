@@ -54,6 +54,8 @@ services:
     restart: unless-stopped
     environment:
       GATEWAY_PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
       AUTH_SERVICE_URL: http://auth:3001
       USERS_SERVICE_URL: http://users:3002
       STORAGE_SERVICE_URL: http://storage:3003
@@ -88,10 +90,13 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-86400}
       USERS_SERVICE_INTERNAL_URL: http://users:3002
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      REDIS_URL: redis://redis:6379
     ports:
       - '3001:3001'
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   users:
@@ -117,8 +122,21 @@ services:
     restart: unless-stopped
     environment:
       PORT: 3003
+      DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/storage_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: 'false'
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minedu}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minedu123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-minedu-files}
     ports:
       - '3003:3003'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
   notifications:
     build:
@@ -127,8 +145,17 @@ services:
     restart: unless-stopped
     environment:
       PORT: 3004
+      DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/notifications_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      REDIS_URL: redis://redis:6379
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
     ports:
       - '3004:3004'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   reports:
     build:
