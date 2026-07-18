@@ -1,0 +1,185 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-minedu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-minedu}
+      POSTGRES_DB: ${POSTGRES_USER:-minedu}
+      POSTGRES_MULTIPLE_DATABASES: auth_db,users_db,storage_db,notifications_db,reports_db,classroom_db,analytics_db,ai_db,accessibility_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-minedu}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minedu}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minedu123}
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    restart: unless-stopped
+    environment:
+      GATEWAY_PORT: 3000
+      AUTH_SERVICE_URL: http://auth:3001
+      USERS_SERVICE_URL: http://users:3002
+      STORAGE_SERVICE_URL: http://storage:3003
+      NOTIFICATIONS_SERVICE_URL: http://notifications:3004
+      REPORTS_SERVICE_URL: http://reports:3005
+      CLASSROOM_SERVICE_URL: http://classroom:3006
+      ANALYTICS_SERVICE_URL: http://analytics:3007
+      AI_SERVICE_URL: http://ai:3008
+      ACCESSIBILITY_SERVICE_URL: http://accessibility:3009
+    ports:
+      - '3000:3000'
+    depends_on:
+      - auth
+      - users
+      - storage
+      - notifications
+      - reports
+      - classroom
+      - analytics
+      - ai
+      - accessibility
+
+  auth:
+    build:
+      context: .
+      dockerfile: apps/auth/Dockerfile
+    restart: unless-stopped
+    environment:
+      AUTH_PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/auth_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-86400}
+      USERS_SERVICE_INTERNAL_URL: http://users:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  users:
+    build:
+      context: .
+      dockerfile: apps/users/Dockerfile
+    restart: unless-stopped
+    environment:
+      USERS_PORT: 3002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/users_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+    ports:
+      - '3002:3002'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  storage:
+    build:
+      context: .
+      dockerfile: apps/storage/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3003
+    ports:
+      - '3003:3003'
+
+  notifications:
+    build:
+      context: .
+      dockerfile: apps/notifications/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3004
+    ports:
+      - '3004:3004'
+
+  reports:
+    build:
+      context: .
+      dockerfile: apps/reports/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3005
+    ports:
+      - '3005:3005'
+
+  classroom:
+    build:
+      context: .
+      dockerfile: apps/classroom/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3006
+    ports:
+      - '3006:3006'
+
+  analytics:
+    build:
+      context: .
+      dockerfile: apps/analytics/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3007
+    ports:
+      - '3007:3007'
+
+  ai:
+    build:
+      context: .
+      dockerfile: apps/ai/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3008
+    ports:
+      - '3008:3008'
+
+  accessibility:
+    build:
+      context: .
+      dockerfile: apps/accessibility/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3009
+    ports:
+      - '3009:3009'
+
+volumes:
+  postgres_data:
+  minio_data:

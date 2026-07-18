@@ -1,0 +1,19 @@
+{
+  "name": "tokenizados-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hackaton MINEDU Backend - monorepo de microservicios NestJS",
+  "scripts": {
+    "dev:gateway": "pnpm --filter gateway start:dev",
+    "dev:auth": "pnpm --filter auth start:dev",
+    "dev:users": "pnpm --filter users start:dev",
+    "build": "pnpm -r build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:build": "docker compose build"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+.env
+*.log
+coverage/
+.DS_Store
+.pnpm-store/
+apps/*/generated/
