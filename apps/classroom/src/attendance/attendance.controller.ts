@@ -1,0 +1,26 @@
+import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard, JwtPayload, RolesGuard, Roles, CurrentUser, Role } from '@minedu/common';
+import { AttendanceService } from './attendance.services';
+import { CreateAttendanceDto } from './dto/create-attendance.dto';
+
+@Controller('attendance')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class AttendanceController {
+  constructor(private readonly attendanceService: AttendanceService) {}
+
+  @Post()
+  @Roles(Role.DOCENTE, Role.ADMIN)
+  create(@Body() dto: CreateAttendanceDto, @CurrentUser() user: JwtPayload) {
+    return this.attendanceService.create(dto, user.sub);
+  }
+
+  @Get('classroom/:classroomId')
+  findByClassroom(@Param('classroomId') classroomId: string) {
+    return this.attendanceService.findByClassroom(classroomId);
+  }
+
+  @Get('student/:studentId')
+  findByStudent(@Param('studentId') studentId: string) {
+    return this.attendanceService.findByStudent(studentId);
+  }
+}

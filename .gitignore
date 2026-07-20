@@ -7,3 +7,8 @@ coverage/
 .DS_Store
 .pnpm-store/
 apps/*/generated/
+**/.env
+**/.claude
+**/.agents
+**/.windsurf
+**/skills-lock.json

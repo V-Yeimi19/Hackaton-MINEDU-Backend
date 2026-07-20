@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  name        String
+  gradeLevel  String
+  teacherId   String
+  createdAt   DateTime @default(now())
+  classrooms  Classroom[]
+}
+
+model Classroom {
+  id          String   @id @default(uuid())
+  name        String
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+  studentIds  String[] // ids que viven en Users Service
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  attendances Attendance[]
+  grades      Grade[]
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+model Attendance {
+  id          String            @id @default(uuid())
+  studentId   String
+  classroomId String
+  classroom   Classroom         @relation(fields: [classroomId], references: [id])
+  date        DateTime
+  status      AttendanceStatus
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model Grade {
+  id          String   @id @default(uuid())
+  studentId   String
+  classroomId String
+  classroom   Classroom @relation(fields: [classroomId], references: [id])
+  evaluation  String
+  score       Float
+  date        DateTime @default(now())
+}
+
+model Competency {
+  id          String   @id @default(uuid())
+  name        String
+  area        String
+  levels      StudentCompetency[]
+}
+
+model StudentCompetency {
+  id           String     @id @default(uuid())
+  studentId    String
+  competencyId String
+  competency   Competency @relation(fields: [competencyId], references: [id])
+  level        String
+  date         DateTime   @default(now())
+}

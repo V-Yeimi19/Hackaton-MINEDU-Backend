@@ -1,14 +1,20 @@
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { HttpExceptionFilter } from '@minedu/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const logger = new Logger('classroom');
+  const configService = app.get(ConfigService);
+  const logger = new Logger('Classroom');
 
-  const port = process.env.PORT ? Number(process.env.PORT) : 3006;
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  const port = configService.get<number>('CLASSROOM_PORT') ?? 3006;
   await app.listen(port);
-  logger.log(`Stub service "classroom" listening on port ${port}`);
+  logger.log(`Classroom service listening on port ${port}`);
 }
 
 bootstrap();
