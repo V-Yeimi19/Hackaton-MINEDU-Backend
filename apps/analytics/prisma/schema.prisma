@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model StudentIndicator {
+  id                 String   @id @default(uuid())
+  studentId          String
+  classroomId        String
+  presentCount       Int      @default(0)
+  totalCount         Int      @default(0)
+  attendanceRate     Float    @default(0)
+  avgGrade           Float    @default(0)
+  gradeCount         Int      @default(0)
+  gradeSum           Float    @default(0)
+  participationScore Float    @default(0)
+  updatedAt          DateTime @updatedAt
+
+  @@unique([studentId, classroomId])
+}
+
+enum RiskLevel {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model RiskAssessment {
+  id          String    @id @default(uuid())
+  studentId   String
+  classroomId String
+  level       RiskLevel
+  reasons     String[]
+  detectedAt  DateTime  @default(now())
+
+  @@index([studentId, classroomId])
+}
+
+enum RecommendationStatus {
+  PENDING
+  SENT
+  DISMISSED
+}
+
+model Recommendation {
+  id          String               @id @default(uuid())
+  studentId   String
+  classroomId String
+  type        String
+  message     String
+  source      String
+  status      RecommendationStatus @default(PENDING)
+  createdAt   DateTime             @default(now())
+
+  @@index([studentId, classroomId])
+}

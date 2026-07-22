@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EVENTS, RedisPubSubService } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
+import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
   constructor(
     private prisma: PrismaService,
     private pubsub: RedisPubSubService,
@@ -32,15 +35,60 @@ export class AttendanceService {
     );
 
     try {
-      await this.pubsub.publish(EVENTS.ATTENDANCE_REGISTERED, {
+      await this.pubsub.publish(EVENTS.ATTENDANCE_BATCH_REGISTERED, {
         classroomId: dto.classroomId,
         date: dto.date,
         count: attendances.length,
         teacherId,
       });
-    } catch {}
+
+      await Promise.all(
+        attendances.map((attendance) =>
+          this.pubsub.publish(EVENTS.ATTENDANCE_REGISTERED, {
+            studentId: attendance.studentId,
+            classroomId: attendance.classroomId,
+            status: attendance.status,
+            date: attendance.date,
+          }),
+        ),
+      );
+    } catch (err) {
+      this.logger.warn(
+        `No se pudo publicar evento(s) de asistencia para aula ${dto.classroomId}`,
+        err instanceof Error ? err.stack : err,
+      );
+    }
 
     return attendances;
+  }
+
+  async update(id: string, dto: UpdateAttendanceDto) {
+    const previous = await this.prisma.attendance.findUnique({ where: { id } });
+    if (!previous) {
+      throw new NotFoundException('Registro de asistencia no encontrado');
+    }
+
+    const updated = await this.prisma.attendance.update({
+      where: { id },
+      data: { status: dto.status },
+    });
+
+    try {
+      await this.pubsub.publish(EVENTS.ATTENDANCE_UPDATED, {
+        studentId: updated.studentId,
+        classroomId: updated.classroomId,
+        status: updated.status,
+        previousStatus: previous.status,
+        date: updated.date,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `No se pudo publicar evento de actualización de asistencia (id: ${id})`,
+        err instanceof Error ? err.stack : err,
+      );
+    }
+
+    return updated;
   }
 
   async findByClassroom(classroomId: string) {

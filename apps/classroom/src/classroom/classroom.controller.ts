@@ -27,13 +27,13 @@ export class ClassroomController {
   }
 
   @Patch(':id')
-  @Roles(Role.DOCENTE, Role.ADMIN)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   update(@Param('id') id: string, @Body() dto: UpdateClassroomDto) {
     return this.classroomService.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles(Role.DOCENTE, Role.ADMIN)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   remove(@Param('id') id: string) {
     return this.classroomService.remove(id);
   }

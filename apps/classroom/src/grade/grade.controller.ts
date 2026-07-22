@@ -10,7 +10,7 @@ export class GradeController {
   constructor(private readonly gradeService: GradeService) {}
 
   @Post()
-  @Roles(Role.DOCENTE, Role.ADMIN)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   create(@Body() dto: CreateGradeDto) {
     return this.gradeService.create(dto);
   }
@@ -26,13 +26,13 @@ export class GradeController {
   }
 
   @Patch(':id')
-  @Roles(Role.DOCENTE, Role.ADMIN)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   update(@Param('id') id: string, @Body() dto: UpdateGradeDto) {
     return this.gradeService.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles(Role.DOCENTE, Role.ADMIN)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   remove(@Param('id') id: string) {
     return this.gradeService.remove(id);
   }

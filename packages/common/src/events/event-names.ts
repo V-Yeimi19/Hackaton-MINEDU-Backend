@@ -9,6 +9,7 @@ export const EVENTS = {
   STUDENT_UNENROLLED: 'student.unenrolled',
   ATTENDANCE_REGISTERED: 'attendance.registered',
   ATTENDANCE_UPDATED: 'attendance.updated',
+  ATTENDANCE_BATCH_REGISTERED: 'attendance.batch.registered',
   GRADE_REGISTERED: 'grade.registered',
   GRADE_UPDATED: 'grade.updated',
   COMPETENCY_EVALUATED: 'competency.evaluated',
