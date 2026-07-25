@@ -1,0 +1,11 @@
+import * as Joi from 'joi';
+
+export const envValidationSchema = Joi.object({
+  REPORTS_PORT: Joi.number().default(3005),
+  DATABASE_URL: Joi.string().required(),
+  JWT_SECRET: Joi.string().required(),
+  INTERNAL_API_KEY: Joi.string().required(),
+  CLASSROOM_SERVICE_INTERNAL_URL: Joi.string().uri().required(),
+  ANALYTICS_SERVICE_INTERNAL_URL: Joi.string().uri().required(),
+  STORAGE_SERVICE_INTERNAL_URL: Joi.string().uri().required(),
+});

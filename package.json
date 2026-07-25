@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "description": "Hackaton MINEDU Backend - monorepo de microservicios NestJS",
+  "packageManager": "pnpm@10.22.0",
   "scripts": {
     "dev:gateway": "pnpm --filter gateway start:dev",
     "dev:auth": "pnpm --filter auth start:dev",
     "dev:users": "pnpm --filter users start:dev",
+    "dev:reports": "pnpm --filter reports start:dev",
     "dev:classroom": "pnpm --filter classroom start:dev",
     "dev:analytics": "pnpm --filter analytics start:dev",
     "dev:ai": "pnpm --filter ai start:dev",

@@ -164,9 +164,18 @@ services:
       dockerfile: apps/reports/Dockerfile
     restart: unless-stopped
     environment:
-      PORT: 3005
+      REPORTS_PORT: 3005
+      DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/reports_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      CLASSROOM_SERVICE_INTERNAL_URL: http://classroom:3006
+      ANALYTICS_SERVICE_INTERNAL_URL: http://analytics:3007
+      STORAGE_SERVICE_INTERNAL_URL: http://storage:3003
     ports:
       - '3005:3005'
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   classroom:
     build:

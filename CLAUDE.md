@@ -2,8 +2,11 @@
 
 Monorepo de microservicios NestJS, dividido por **capas de responsabilidad** entre 2 desarrolladores (no por microservicio), para minimizar bloqueos durante el hackathon.
 
-- **Desarrollador A**: Gateway, Auth, Users, Storage, Notifications, Reports, Docker, seguridad. Ya implementado (Semana 1 y 2): Gateway (proxy + rate limit + JWT check), Auth, Users, Storage (MinIO), Notifications (BullMQ + WebSocket + eventos), docker-compose completo. Pendiente: Reports (Semana 3).
-- **Desarrollador B**: Classroom, Analytics (Gemelo Digital), AI, Accessibility. Hoy son stubs de health-check en `apps/{classroom,analytics,ai,accessibility}` — B reemplaza el contenido sin tocar Gateway ni docker-compose.
+- **Desarrollador A**: Gateway, Auth, Users, Storage, Notifications, Reports, Docker, seguridad. Todo implementado: Gateway (proxy + rate limit + JWT check), Auth, Users, Storage (MinIO), Notifications (BullMQ + WebSocket + eventos), Reports (reportes institucionales agregados, ver abajo), docker-compose completo.
+- **Desarrollador B**: Classroom, Analytics (Gemelo Digital), AI, Accessibility. Los 4 están implementados (ya no son stubs): Classroom (cursos/aulas/asistencia/notas/competencias + eventos), Analytics (indicadores + riesgo + recomendaciones, suscrito a eventos de Classroom), AI (reporte PDF semanal *por aula*, `/api/ai/reports`, orquesta Classroom+Analytics+Storage), Accessibility (pipeline OCR + adaptación de texto vía OpenAI + texto-a-voz).
+
+### Reports vs AI — no son el mismo reporte
+`apps/reports` (Dev A) y el `report` module de `apps/ai` (Dev B) coexisten a propósito, con alcance distinto: **AI genera el PDF semanal de una sola aula** (`POST /api/ai/reports/generate`, datos filtrados por `weekStart`/`weekEnd` de una `classroomId`), mientras que **Reports genera un CSV agregado multi-aula** para `ADMIN`/`DIRECTIVO` (`POST /api/reports/generate`, filtrable por `gradeLevel` o `courseId`, sin restringirse a una sola aula) — pensado para dashboards institucionales, no para el reporte docente de una sección. Reports reutiliza los mismos endpoints internos de Classroom/Analytics que ya consume AI (`/internal/classrooms`, `/internal/classroom/:id/attendances`, `/internal/classroom/:id/grades`, `/internal/risk/classroom/:id`) y sube el CSV a Storage con el mismo patrón de `POST /internal/upload`. Si se toca uno de los dos, revisar si el cambio también aplica al otro (misma fuente de datos, agregación distinta).
 
 ## Estructura
 

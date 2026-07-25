@@ -17,14 +17,13 @@ describe('Full Pipeline E2E Smoke Test', () => {
         .send({
           email: testEmail,
           password: 'Test1234!',
-          firstName: 'Juan',
-          lastName: 'Perez',
+          fullName: 'Juan Perez',
           role: 'DOCENTE',
         });
 
       if (res.status === 201) {
-        expect(res.body.id).toBeDefined();
-        userId = res.body.id;
+        expect(res.body.user.id).toBeDefined();
+        userId = res.body.user.id;
         userEmail = testEmail;
       } else {
         console.warn('Auth register skipped (service may not be running)');
@@ -141,7 +140,20 @@ describe('Full Pipeline E2E Smoke Test', () => {
     });
   });
 
-  describe('6. Gateway Security', () => {
+  describe('6. Institution Reports Flow', () => {
+    it('should list institution reports', async () => {
+      const res = await request(GATEWAY_URL)
+        .get('/api/reports')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect([200, 401, 403]).toContain(res.status);
+      if (res.status === 200) {
+        expect(Array.isArray(res.body)).toBe(true);
+      }
+    });
+  });
+
+  describe('7. Gateway Security', () => {
     it('should reject unauthenticated requests to protected routes', async () => {
       const res = await request(GATEWAY_URL)
         .get('/api/classroom/classrooms');
@@ -158,8 +170,9 @@ describe('Full Pipeline E2E Smoke Test', () => {
     });
   });
 
-  describe('7. Health Checks', () => {
+  describe('8. Health Checks', () => {
     const services = [
+      { name: 'reports', port: 3005 },
       { name: 'classroom', port: 3006 },
       { name: 'analytics', port: 3007 },
       { name: 'ai', port: 3008 },

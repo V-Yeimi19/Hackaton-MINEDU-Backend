@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model InstitutionReport {
+  id                String   @id @default(uuid())
+  gradeLevel        String?
+  courseId          String?
+  periodStart       DateTime
+  periodEnd         DateTime
+  classroomCount    Int
+  studentCount      Int
+  avgAttendanceRate Float
+  avgGrade          Float
+  riskCounts        Json
+  fileId            String?
+  generatedBy       String
+  createdAt         DateTime @default(now())
+
+  @@index([gradeLevel])
+  @@index([courseId])
+}

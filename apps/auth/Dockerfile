@@ -1,5 +1,6 @@
 FROM node:22-alpine AS build
 RUN corepack enable
+RUN apk add --no-cache openssl
 WORKDIR /repo
 
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* tsconfig.base.json ./
@@ -13,6 +14,7 @@ RUN pnpm --filter auth build
 
 FROM node:22-alpine AS runtime
 RUN corepack enable
+RUN apk add --no-cache openssl
 WORKDIR /repo
 
 COPY --from=build /repo ./
