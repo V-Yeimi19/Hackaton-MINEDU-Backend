@@ -75,7 +75,7 @@ El dominio operacional principal. **Remodelado a nivel de BD el 2026-07-25** (ve
 - `CompetencyController` (`/competencies`) — ídem (por curso ahora).
 - `SupportNeedController` (`/support-needs`) — vigente en espíritu, pero `studentId` ahora es `Student.id` (FK real) y los guards referencian `ESPECIALISTA` (rol eliminado); falta decidir el acceso del `FAMILIAR` a las necesidades de su propio hijo.
 - `InternalController` (`/internal`) — contratos a re-validar: `GET /internal/classroom/:id/grades` ahora implica agregar las notas de los cursos del aula.
-- **Endpoints nuevos por construir** (otro dev): CRUD de `Institution` (solo DIRECTIVO), invitaciones (crear/aceptar/revocar, tipos `TEACHER_TO_INSTITUTION` y `FAMILY_TO_CLASSROOM`), registro de `Student` por el FAMILIAR (con sus necesidades de apoyo), matrícula vía aceptación de invitación (1 hijo por link).
+- **Endpoints nuevos por construir** (otro dev): CRUD de `Institution` (solo DIRECTIVO), invitaciones (crear/aceptar/revocar, tipos `TEACHER_TO_INSTITUTION` y `FAMILY_TO_CLASSROOM`), registro de `Student` por el FAMILIAR (con sus necesidades de apoyo), matrícula vía aceptación de invitación (1 hijo por link). Los DOCENTEs pueden crear aulas **sin pertenecer a ninguna IE** (`institutionId = null`, aula independiente); al aceptar una invitación de IE, sus aulas independientes se importan a esa institución.
 
 Publica 11 eventos (catálogo abajo) — los payloads de nota/competencia necesitarán incluir `classroomId` resuelto vía `Course` para que Analytics siga funcionando (pendiente).
 

@@ -10,7 +10,7 @@ El 2026-07-25 se remodeló el dominio **solo a nivel de base de datos** (schemas
 
 `@minedu/common` ya exporta el `Role` nuevo y los clientes Prisma de classroom se regenerarán contra el schema nuevo en el próximo build — estos archivos no compilan hasta adaptarse:
 
-- [ ] `apps/classroom/src/classroom/classroom.controller.ts:42,48` + `classroom.services.ts` — `@Roles(Role.ESTUDIANTE)` en `enroll`/`unenroll` y todo el manejo de `studentIds` (campo eliminado). El flujo entero se reemplaza por invitaciones (`Invitation` + `Enrollment`). Los DTOs de Classroom además necesitan `institutionId`/`gradeLevel`.
+- [ ] `apps/classroom/src/classroom/classroom.controller.ts:42,48` + `classroom.services.ts` — `@Roles(Role.ESTUDIANTE)` en `enroll`/`unenroll` y todo el manejo de `studentIds` (campo eliminado). El flujo entero se reemplaza por invitaciones (`Invitation` + `Enrollment`). Los DTOs de Classroom además necesitan `gradeLevel` e `institutionId` **opcional** (si se omite, el aula nace independiente del docente, sin IE).
 - [ ] `apps/classroom/src/course/*` (controller, service, DTOs) — `Course` ya no tiene `gradeLevel` ni `teacherId` (viven en `Classroom`) y ahora exige `classroomId` (relación invertida).
 - [ ] `apps/classroom/src/grade/*` y `apps/classroom/src/competency/*` — `Grade`/`StudentCompetency` ahora referencian `courseId`, no `classroomId`; DTOs y queries cambian.
 - [ ] `apps/classroom/src/attendance/*` — vigente en estructura (sigue por aula), pero `studentId` ahora es `Student.id` con FK real: registrar asistencia de un estudiante no matriculado o inexistente fallará por FK — validar contra `Enrollment`.
@@ -29,7 +29,8 @@ El 2026-07-25 se remodeló el dominio **solo a nivel de base de datos** (schemas
 ### Endpoints nuevos por construir
 
 - [ ] CRUD de `Institution` — solo `DIRECTIVO` crea/administra sus IEs.
-- [ ] Invitaciones: `DIRECTIVO` genera link `TEACHER_TO_INSTITUTION`; `DOCENTE` (miembro de la IE vía `InstitutionTeacher`) genera link `FAMILY_TO_CLASSROOM`; endpoints de aceptar (valida token único/no expirado/no usado, crea `InstitutionTeacher` o `Enrollment` según tipo) y revocar.
+- [ ] Invitaciones: `DIRECTIVO` genera link `TEACHER_TO_INSTITUTION`; `DOCENTE` (miembro de la IE vía `InstitutionTeacher` **o dueño del aula independiente**) genera link `FAMILY_TO_CLASSROOM`; endpoints de aceptar (valida token único/no expirado/no usado, crea `InstitutionTeacher` o `Enrollment` según tipo) y revocar.
+- [ ] **Importación de aulas al aceptar invitación de IE**: al aceptar `TEACHER_TO_INSTITUTION`, además de crear `InstitutionTeacher`, importar las aulas independientes del docente: `UPDATE "Classroom" SET "institutionId" = <IE> WHERE "teacherId" = <docente> AND "institutionId" IS NULL`. Decisión de producto abierta: importar todas automáticamente (recomendado para el hackathon, es un solo UPDATE) vs. dejar que el docente elija cuáles. Nota: el schema ya soporta ambos; el FK es `SetNull`, así que borrar la IE devuelve las aulas al estado independiente en vez de destruirlas.
 - [ ] Registro de `Student` por el `FAMILIAR` (con `StudentSupportNeed` opcionales en el mismo flujo) y edición/lectura de sus propios hijos.
 - [ ] Matrícula: al aceptar una invitación de aula, el `FAMILIAR` elige **1** de sus hijos → se crea el `Enrollment` (constraint `@@unique([classroomId, studentId])` ya lo protege de duplicados).
 

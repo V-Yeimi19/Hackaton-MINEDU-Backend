@@ -37,15 +37,17 @@ model InstitutionTeacher {
 }
 
 // ============================================================
-// Aula (creada por un DOCENTE de la IE) → cursos dentro del aula
+// Aula (creada por un DOCENTE) → cursos dentro del aula.
+// institutionId null = aula independiente del docente; al aceptar
+// una invitación a una IE, sus aulas independientes se importan.
 // ============================================================
 
 model Classroom {
-  id            String      @id @default(uuid())
+  id            String       @id @default(uuid())
   name          String
   gradeLevel    String
-  institutionId String
-  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
   teacherId     String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt

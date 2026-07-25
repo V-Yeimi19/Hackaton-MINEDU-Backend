@@ -113,7 +113,7 @@ erDiagram
         string id PK
         string name
         string gradeLevel "se mudo aqui desde Course"
-        string institutionId FK
+        string institutionId FK "NULLABLE: null = aula independiente del docente, sin IE"
         string teacherId "authUserId del DOCENTE dueno del aula"
         datetime createdAt
         datetime updatedAt
@@ -199,9 +199,10 @@ Notas de diseño:
 
 - **Flujo de invitaciones (un solo uso)**: el DIRECTIVO crea la `Institution` y genera `Invitation` de tipo `TEACHER_TO_INSTITUTION` (el DOCENTE que la acepta queda en `InstitutionTeacher`). El DOCENTE crea aulas en la IE y genera `Invitation` de tipo `FAMILY_TO_CLASSROOM`; el FAMILIAR que la acepta adjunta **1 hijo (`Student`) por invitación**, lo que crea el `Enrollment`. `InvitationType` = `TEACHER_TO_INSTITUTION | FAMILY_TO_CLASSROOM`; `InvitationStatus` = `PENDING | ACCEPTED | REVOKED | EXPIRED`; `token` (`@unique`) es lo que viaja en el link.
 - **`Student` no es usuario**: no tiene fila en `auth_db`/`users_db` ni puede loguear. `familiarId` es el `authUserId` del FAMILIAR responsable. Todas las tablas que antes guardaban `studentId = authUserId` ahora referencian `Student.id` **con FK real** (misma DB) — esto incluye `Attendance`, `Grade`, `StudentCompetency`, `StudentSupportNeed` y `Enrollment`.
+- **Aulas independientes e importación a la IE**: `Classroom.institutionId` es nullable — un DOCENTE puede crear aulas por su cuenta sin pertenecer a ninguna IE (`institutionId = null`). Al aceptar una invitación `TEACHER_TO_INSTITUTION`, sus aulas independientes se **importan** a esa institución (se les asigna el `institutionId`). El FK es `onDelete: SetNull`: si el director borra la IE, las aulas no se destruyen — vuelven a ser independientes del docente (el aula pertenece al docente; la IE es una afiliación).
 - **Matrícula = `Enrollment` al aula** (`@@unique([classroomId, studentId])`), reemplaza el array `Classroom.studentIds`. Ahora sí hay fecha de ingreso y trazabilidad de qué invitación la originó.
 - **Asistencia por aula, notas y competencias por curso** (decisión de diseño): `Attendance.classroomId` (se asiste al aula), `Grade.courseId` y `StudentCompetency.courseId` (se califica por curso). `AttendanceStatus` = `PRESENT | ABSENT | LATE | EXCUSED`, `@@unique([studentId, classroomId, date])` se mantiene.
-- Cascadas: borrar una `Institution` borra sus aulas (y estas sus cursos/matrículas/asistencias); borrar un `Student` borra sus matrículas, asistencias, notas, competencias y necesidades de apoyo.
+- Cascadas: borrar una `Institution` **no** borra sus aulas (quedan independientes por el `SetNull` de arriba), pero sí borra sus `InstitutionTeacher` e invitaciones; borrar un aula borra sus cursos/matrículas/asistencias; borrar un `Student` borra sus matrículas, asistencias, notas, competencias y necesidades de apoyo.
 - **`StudentSupportNeed`** (desafío de Educación Básica Especial, Categoría A — ver `docs/hackathon-bases-2026.pdf`): mismos enums de antes (`SupportNeedType` con 9 valores, `SupportLevel = LEVE | MODERADO | SIGNIFICATIVO`, mismo vocabulario que `AdaptationLevel` en `accessibility_db`), pero ahora cuelga de `Student` con FK real y lo registra normalmente el FAMILIAR al crear a su hijo. Una fila por necesidad (un estudiante puede tener varias). Consumido por Accessibility vía `GET /internal/support-needs/student/:studentId` (el id ahora es `Student.id`).
 - La migración `20260725170002_institutions_and_families` fue **destructiva** (dropeó y recreó todo el dominio — data de prueba de hackathon, aprobado).
 

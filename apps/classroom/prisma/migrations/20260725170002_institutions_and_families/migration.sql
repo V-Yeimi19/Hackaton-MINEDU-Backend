@@ -2,6 +2,8 @@
   Remodelado destructivo del dominio (data de prueba de hackathon, aprobado):
   - Nueva jerarquía: Institution (IE, del DIRECTIVO) -> Classroom (aula, del DOCENTE) -> Course (curso).
     Se INVIERTE la relación anterior (antes Course -> Classrooms).
+  - Un DOCENTE puede tener aulas independientes (institutionId NULL, sin IE); al aceptar
+    una invitación a una IE, sus aulas independientes se importan a esa institución.
   - El estudiante deja de ser usuario: nuevo modelo Student, registrado por su FAMILIAR.
   - La matrícula pasa del array Classroom.studentIds a la tabla Enrollment (al aula, 1 hijo por invitación).
   - Invitaciones por link de un solo uso (DIRECTIVO->DOCENTE a la IE, DOCENTE->FAMILIAR al aula).
@@ -51,11 +53,14 @@ CREATE TABLE "InstitutionTeacher" (
 );
 
 -- CreateTable
+-- institutionId es NULLABLE: un aula con institutionId NULL es un aula
+-- independiente del docente; al aceptar una invitación a una IE, sus
+-- aulas independientes se importan (se les asigna la institución).
 CREATE TABLE "Classroom" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "gradeLevel" TEXT NOT NULL,
-    "institutionId" TEXT NOT NULL,
+    "institutionId" TEXT,
     "teacherId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -201,8 +206,8 @@ CREATE INDEX "StudentSupportNeed_studentId_idx" ON "StudentSupportNeed"("student
 -- AddForeignKey
 ALTER TABLE "InstitutionTeacher" ADD CONSTRAINT "InstitutionTeacher_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "Classroom" ADD CONSTRAINT "Classroom_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (SET NULL: si se borra la IE, las aulas vuelven a ser independientes, no se destruyen)
+ALTER TABLE "Classroom" ADD CONSTRAINT "Classroom_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Course" ADD CONSTRAINT "Course_classroomId_fkey" FOREIGN KEY ("classroomId") REFERENCES "Classroom"("id") ON DELETE CASCADE ON UPDATE CASCADE;
