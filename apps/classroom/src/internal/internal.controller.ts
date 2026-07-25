@@ -40,4 +40,9 @@ export class InternalController {
   getAllCourses() {
     return this.prisma.course.findMany({ include: { classrooms: true } });
   }
+
+  @Get('support-needs/student/:studentId')
+  getSupportNeeds(@Param('studentId') studentId: string) {
+    return this.prisma.studentSupportNeed.findMany({ where: { studentId } });
+  }
 }

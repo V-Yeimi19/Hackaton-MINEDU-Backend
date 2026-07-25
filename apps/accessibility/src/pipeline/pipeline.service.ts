@@ -7,10 +7,12 @@ import { Prisma } from '../../generated/prisma';
 import { OcrService } from '../ocr/ocr.service';
 import { AdaptationService } from '../adaptation/adaptation.service';
 import { AudioService } from '../audio/audio.service';
-import { ProcessContentDto, AdaptationLevel } from './dto/pipeline.dto';
+import { ProcessContentDto, GenerateWorksheetDto, AdaptationLevel } from './dto/pipeline.dto';
 import { EVENTS, RedisPubSubService } from '@minedu/common';
 import { PictogramService } from './pictogram.service';
 import { generateSrt, estimateSpeechDuration } from './srt.util';
+import { buildWorksheetPdf } from './worksheet-pdf.util';
+import { SupportNeedEntry } from './worksheet.types';
 
 @Injectable()
 export class PipelineService {
@@ -33,6 +35,25 @@ export class PipelineService {
 
   private get internalKey() {
     return this.config.get<string>('INTERNAL_API_KEY');
+  }
+
+  private get classroomUrl() {
+    return this.config.get<string>('CLASSROOM_SERVICE_INTERNAL_URL');
+  }
+
+  private async fetchSupportNeeds(studentId: string): Promise<SupportNeedEntry[]> {
+    try {
+      const { data } = await firstValueFrom(
+        this.http.get<SupportNeedEntry[]>(
+          `${this.classroomUrl}/internal/support-needs/student/${studentId}`,
+          { headers: { 'x-internal-key': this.internalKey } },
+        ),
+      );
+      return data;
+    } catch (err) {
+      this.logger.warn(`No se pudieron obtener necesidades de apoyo de ${studentId}`, err);
+      return [];
+    }
   }
 
   private async downloadFile(fileId: string): Promise<{ buffer: Buffer; contentType: string }> {
@@ -190,6 +211,44 @@ export class PipelineService {
 
       throw err;
     }
+  }
+
+  async processWorksheet(dto: GenerateWorksheetDto) {
+    const { job } = await this.process(dto);
+    if (!job) {
+      throw new Error('No se pudo generar la ficha: el job base no se completó');
+    }
+
+    this.logger.log(`[${job.id}] Generando ficha didáctica...`);
+
+    const supportNeeds = dto.studentId ? await this.fetchSupportNeeds(dto.studentId) : [];
+
+    const worksheetContent = await this.adaptation.generateWorksheet(
+      job.adaptedText ?? '',
+      dto.adaptationLevel,
+      supportNeeds,
+    );
+
+    const pictograms = (job.pictogramData as unknown as { keyword: string; arasaacId: number; imageUrl: string }[]) ?? [];
+
+    const worksheetPdf = await buildWorksheetPdf(worksheetContent, pictograms, this.http);
+
+    this.logger.log(`[${job.id}] Subiendo ficha a Storage...`);
+    const worksheetFileId = await this.uploadToStorage(
+      worksheetPdf,
+      `ficha-${job.id}.pdf`,
+      'application/pdf',
+    );
+
+    const updatedJob = await this.prisma.accessibilityJob.update({
+      where: { id: job.id },
+      data: {
+        worksheetFileId,
+        worksheetContent: worksheetContent as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return { job: updatedJob, worksheetPdf };
   }
 
   async findOne(id: string) {

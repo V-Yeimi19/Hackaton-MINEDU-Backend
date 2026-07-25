@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Param, Body, UseGuards, Res } from '@nestjs/common';
 import { JwtAuthGuard, RolesGuard, Roles, Role } from '@minedu/common';
 import { PipelineService } from './pipeline/pipeline.service';
-import { ProcessContentDto } from './pipeline/dto/pipeline.dto';
+import { ProcessContentDto, GenerateWorksheetDto } from './pipeline/dto/pipeline.dto';
 import { Response } from 'express';
 
 @Controller()
@@ -24,10 +24,20 @@ export class AccessibilityController {
   async processAndReturnAudio(@Body() dto: ProcessContentDto, @Res() res: Response) {
     const result = await this.pipelineService.process(dto);
     res.set({
-      'Content-Type': 'audio/wav',
-      'Content-Disposition': `attachment; filename="audio-${result.job?.id}.wav"`,
+      'Content-Type': 'audio/mpeg',
+      'Content-Disposition': `attachment; filename="audio-${result.job?.id}.mp3"`,
     });
     res.send(result.audioBuffer);
+  }
+
+  @Post('process/worksheet')
+  @Roles(Role.ADMIN, Role.DOCENTE, Role.ESPECIALISTA)
+  async processWorksheet(@Body() dto: GenerateWorksheetDto) {
+    const result = await this.pipelineService.processWorksheet(dto);
+    return {
+      job: result.job,
+      worksheetSize: result.worksheetPdf.length,
+    };
   }
 
   @Get('jobs')

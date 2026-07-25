@@ -9,5 +9,6 @@ export const envValidationSchema = Joi.object({
   ELEVENLABS_API_KEY: Joi.string().required(),
   ELEVENLABS_VOICE_ID: Joi.string().default('JBFqnCBsd6RMkjVDRZzb'),
   STORAGE_SERVICE_INTERNAL_URL: Joi.string().uri().required(),
+  CLASSROOM_SERVICE_INTERNAL_URL: Joi.string().uri().required(),
   REDIS_URL: Joi.string().default('redis://localhost:6379'),
 });

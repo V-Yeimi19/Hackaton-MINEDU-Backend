@@ -71,7 +71,7 @@ erDiagram
     }
 ```
 
-## `classroom_db` — Classroom (6 modelos, el esquema más grande)
+## `classroom_db` — Classroom (7 modelos, el esquema más grande)
 
 ```mermaid
 erDiagram
@@ -125,6 +125,16 @@ erDiagram
         string level
         datetime date
     }
+    StudentSupportNeed {
+        string id PK
+        string studentId "authUserId, sin FK real"
+        SupportNeedType type
+        SupportLevel level
+        string description "nullable, notas del docente/especialista"
+        string registeredBy "authUserId de quien lo registro"
+        datetime createdAt
+        datetime updatedAt
+    }
 ```
 
 Notas de diseño:
@@ -133,6 +143,7 @@ Notas de diseño:
 - `AttendanceStatus` = `PRESENT | ABSENT | LATE | EXCUSED`. `Attendance` tiene `@@unique([studentId, classroomId, date])` — un estudiante no puede tener dos registros de asistencia el mismo día en la misma aula (el `POST /attendance` batch hace upsert implícito por esta constraint).
 - `Grade.classroomId` tiene `onDelete: Cascade` desde `Classroom`; `Attendance.classroomId` también. Si se borra un aula, se borran sus asistencias y notas.
 - `teacherId` en `Course` no es una foreign key real — es el `authUserId` del docente, validado solo a nivel de aplicación (no de Postgres).
+- **`StudentSupportNeed`** (agregado 2026-07-25, desafío de Educación Básica Especial de la Categoría A del hackathon — ver `docs/hackathon-bases-2026.pdf`) registra qué tipo de necesidad de apoyo/discapacidad presenta un estudiante. `SupportNeedType` = `DISCAPACIDAD_VISUAL | DISCAPACIDAD_AUDITIVA | DISCAPACIDAD_INTELECTUAL | DISCAPACIDAD_MOTORA | TRASTORNO_ESPECTRO_AUTISTA | DIFICULTAD_APRENDIZAJE | TDAH | MULTIDISCAPACIDAD | OTRO` — lista de partida, no una taxonomía MINEDU verificada, ajustable. `SupportLevel` = `LEVE | MODERADO | SIGNIFICATIVO`, mismo vocabulario que `AdaptationLevel` en `accessibility_db` (enums distintos, mismos tres niveles, para que la traducción "necesidad → adaptación de contenido" sea directa). **Una fila por necesidad, no un perfil único** — un estudiante puede tener varias filas (ej. TEA + dificultad de aprendizaje). Sin acceso de lectura para el rol `ESTUDIANTE` a nivel de endpoint (dato sensible). Consumido de forma síncrona por Accessibility vía `GET /internal/support-needs/student/:studentId` para personalizar fichas didácticas — ver [SERVICES.md](./SERVICES.md#accessibility--puerto-3009-db-accessibility_db).
 
 ## `analytics_db` — Analytics (3 modelos)
 
@@ -215,6 +226,8 @@ erDiagram
         string audioFileId "nullable, id del MP3 en storage_db, generado por ElevenLabs"
         string subtitlesFileId "nullable, id del SRT en storage_db, generado con timestamps proporcionales"
         json pictogramData "nullable, array de {keyword, arasaacId, imageUrl} de la API ARASAAC"
+        string worksheetFileId "nullable, id del PDF de la ficha didáctica en storage_db, agregado 2026-07-25"
+        json worksheetContent "nullable, {title, instructions, exercises[]} generado por Groq, agregado 2026-07-25"
         AdaptationLevel adaptationLevel
         string error "nullable"
         datetime createdAt
@@ -222,7 +235,9 @@ erDiagram
     }
 ```
 
-`JobStatus` = `PENDING | PROCESSING | COMPLETED | FAILED`. `AdaptationLevel` = `LEVE | MODERADO | SIGNIFICATIVO`. Los tres campos de salida (`audioFileId`, `subtitlesFileId`, `pictogramData`) se poblan al completar el pipeline: el audio (MP3, generado por ElevenLabs) se sube a Storage vía `POST /internal/upload` (base64 JSON), el SRT se genera con `srt.util.ts` (timestamps proporcionales basados en una duración estimada por velocidad de habla, no en el audio en sí — parsear duración real de un MP3 requeriría decodificar frames, no solo leer un header como en WAV), y los pictogramas se obtienen de la API pública de ARASAAC (hasta 10 keywords más frecuentes del texto adaptado, excluyendo stop words en español).
+`JobStatus` = `PENDING | PROCESSING | COMPLETED | FAILED`. `AdaptationLevel` = `LEVE | MODERADO | SIGNIFICATIVO`. Los campos de salida del pipeline base (`audioFileId`, `subtitlesFileId`, `pictogramData`) se poblan al completar `POST /process`: el audio (MP3, generado por ElevenLabs) se sube a Storage vía `POST /internal/upload` (base64 JSON), el SRT se genera con `srt.util.ts` (timestamps proporcionales basados en una duración estimada por velocidad de habla, no en el audio en sí — parsear duración real de un MP3 requeriría decodificar frames, no solo leer un header como en WAV), y los pictogramas se obtienen de la API pública de ARASAAC (hasta 10 keywords más frecuentes del texto adaptado, excluyendo stop words en español).
+
+`worksheetFileId`/`worksheetContent` se poblan solo si se llama `POST /process/worksheet` (agregado 2026-07-25) — reusa el `adaptedText` y los `pictogramData` ya calculados por el pipeline base, le pide a Groq reestructurarlos como ficha (título + instrucciones + 3-5 ejercicios), opcionalmente personalizada contra `StudentSupportNeed` de `classroom_db` (vía HTTP interno, si se pasa `studentId`), y arma un PDF con `pdfkit` que se sube a Storage. Ver [SERVICES.md](./SERVICES.md#accessibility--puerto-3009-db-accessibility_db).
 
 ## `reports_db` — Reports
 

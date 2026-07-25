@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export enum AdaptationLevel {
   LEVE = 'LEVE',
@@ -21,4 +21,10 @@ export class ProcessContentDto {
 
   @IsEnum(AdaptationLevel)
   adaptationLevel: AdaptationLevel = AdaptationLevel.MODERADO;
+}
+
+export class GenerateWorksheetDto extends ProcessContentDto {
+  @IsOptional()
+  @IsUUID()
+  studentId?: string;
 }

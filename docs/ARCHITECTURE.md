@@ -26,6 +26,7 @@ flowchart TB
     AI -.->|"GET /internal/*"| ANALYTICS
     AI -.->|"upload/download"| STORAGE
     ACCESS -.->|"download + upload"| STORAGE
+    ACCESS -.->|"GET /internal/support-needs/*"| CLASSROOM
 
     AUTH -->|"user.created, user.role_changed"| REDIS[(Redis pub/sub)]
     CLASSROOM -->|"11 eventos: course/classroom/attendance/grade/competency"| REDIS

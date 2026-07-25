@@ -12,3 +12,4 @@ apps/*/generated/
 **/.agents
 **/.windsurf
 **/skills-lock.json
+/webtest/

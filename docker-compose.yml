@@ -259,6 +259,7 @@ services:
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
       ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID:-JBFqnCBsd6RMkjVDRZzb}
       STORAGE_SERVICE_INTERNAL_URL: http://storage:3003
+      CLASSROOM_SERVICE_INTERNAL_URL: http://classroom:3006
       REDIS_URL: redis://redis:6379
     ports:
       - '3009:3009'

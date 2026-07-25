@@ -82,3 +82,34 @@ model StudentCompetency {
 
   @@index([studentId, classroomId])
 }
+
+enum SupportNeedType {
+  DISCAPACIDAD_VISUAL
+  DISCAPACIDAD_AUDITIVA
+  DISCAPACIDAD_INTELECTUAL
+  DISCAPACIDAD_MOTORA
+  TRASTORNO_ESPECTRO_AUTISTA
+  DIFICULTAD_APRENDIZAJE
+  TDAH
+  MULTIDISCAPACIDAD
+  OTRO
+}
+
+enum SupportLevel {
+  LEVE
+  MODERADO
+  SIGNIFICATIVO
+}
+
+model StudentSupportNeed {
+  id           String          @id @default(uuid())
+  studentId    String
+  type         SupportNeedType
+  level        SupportLevel    @default(MODERADO)
+  description  String?
+  registeredBy String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([studentId])
+}

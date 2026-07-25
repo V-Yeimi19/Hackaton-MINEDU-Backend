@@ -84,6 +84,9 @@ importers:
       passport-jwt:
         specifier: ^4.0.1
         version: 4.0.1
+      pdfkit:
+        specifier: ^0.15.0
+        version: 0.15.2
       prisma:
         specifier: ^5.15.0
         version: 5.22.0
@@ -109,6 +112,9 @@ importers:
       '@types/node':
         specifier: ^20.14.2
         version: 20.19.43
+      '@types/pdfkit':
+        specifier: ^0.13.9
+        version: 0.13.9
       source-map-support:
         specifier: ^0.5.21
         version: 0.5.21
