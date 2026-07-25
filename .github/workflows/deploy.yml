@@ -1,0 +1,85 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  SERVICES: "auth users storage notifications reports classroom analytics ai accessibility gateway"
+  PRISMA_SERVICES: "auth users storage notifications reports classroom analytics ai accessibility"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.22.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @minedu/common
+        run: pnpm --filter @minedu/common build
+
+      - name: Generate Prisma clients
+        run: |
+          for svc in $PRISMA_SERVICES; do
+            echo "== Generating Prisma client: $svc =="
+            DATABASE_URL="postgresql://x:x@localhost:5432/x" pnpm --filter "$svc" exec prisma generate
+          done
+
+      - name: Build all services
+        run: |
+          for svc in $SERVICES; do
+            echo "== Building: $svc =="
+            pnpm --filter "$svc" build
+          done
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: vps-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Trust VPS host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.IP }}" >> ~/.ssh/known_hosts
+
+      - name: Sync code to VPS
+        run: |
+          rsync -az \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='**/generated' \
+            --exclude='.env' \
+            ./ root@${{ secrets.IP }}:/opt/tokenizados_backend/
+
+      - name: Build images and restart stack
+        run: |
+          ssh root@${{ secrets.IP }} "cd /opt/tokenizados_backend && docker compose build && docker compose up -d"
+
+      - name: Health check
+        run: |
+          sleep 15
+          curl -sf "http://${{ secrets.IP }}:3000/api/health" || (echo "Health check failed" && exit 1)
