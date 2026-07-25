@@ -513,27 +513,46 @@ Este es el servicio más grande. Contiene 10 sub-recursos.
 
 | Método | Ruta | Acceso | Body | Response |
 |--------|------|--------|------|----------|
-| `POST` | `/invitations/teacher` | DIRECTIVO | `{ email, institutionId }` | `Invitation` |
-| `POST` | `/invitations/family` | DOCENTE | `{ email, classroomId }` | `Invitation` |
-| `POST` | `/invitations/accept/teacher` | Público (sin JWT) | `{ token, email, password, fullName }` | Crea usuario + membresía |
-| `POST` | `/invitations/accept/family` | FAMILIAR | `{ token, studentId }` | Crea Enrollment |
+| `POST` | `/invitations` | DOCENTE, DIRECTIVO | `{ email, type, classroomId?, institutionId? }` | `Invitation` |
+| `POST` | `/invitations/accept/teacher` | Público (sin JWT, pero requiere JWT) | `{ token }` | `InstitutionTeacher` + aulas importadas |
+| `POST` | `/invitations/accept/family` | FAMILIAR | `{ token, studentId }` | `Enrollment` |
 | `GET` | `/invitations/token/:token` | Público (sin JWT) | — | `Invitation` |
-| `GET` | `/invitations/pending/institution/:institutionId` | DIRECTIVO | — | `Invitation[]` |
-| `GET` | `/invitations/pending/classroom/:classroomId` | DOCENTE | — | `Invitation[]` |
+| `GET` | `/invitations` | JWT | — | `Invitation[]` (propias) |
 | `PATCH` | `/invitations/:id/revoke` | Cualquier autenticado | — | `Invitation` (REVOKED) |
 
+**Flujo de invitación docente**:
+1. El docente se registra normalmente (`POST /auth/register` con rol `DOCENTE`) — tiene su cuenta propia.
+2. El DIRECTIVO crea la invitación (`POST /invitations` con `type: "TEACHER_TO_INSTITUTION"`).
+3. Se envía email con link a `/invitations/{token}`.
+4. El docente abre el link → `GET /invitations/token/:token` muestra los detalles (público, sin JWT).
+5. El docente acepta con su JWT: `POST /invitations/accept/teacher` con `{ token }`. Se crea `InstitutionTeacher` y se importan sus aulas independientes a la IE.
+
+**Flujo de invitación familiar**:
+1. El FAMILIAR se registra y registra a sus hijos (`POST /students`).
+2. El DOCENTE crea la invitación (`POST /invitations` con `type: "FAMILY_TO_CLASSROOM"`).
+3. Se envía email con link.
+4. El FAMILIAR abre el link → `GET /invitations/token/:token` (público).
+5. El FAMILIAR acepta con su JWT: `POST /invitations/accept/family` con `{ token, studentId }`. Se crea `Enrollment` para ese hijo.
+
 ```typescript
+// CreateInvitationDto
+{
+  email: string;               // email del invitado
+  type: "TEACHER_TO_INSTITUTION" | "FAMILY_TO_CLASSROOM";
+  institutionId?: string;      // requerido si type = TEACHER_TO_INSTITUTION
+  classroomId?: string;        // requerido si type = FAMILY_TO_CLASSROOM
+}
+
 // Invitation
 {
   id: string;
   token: string;              // token único para el link
   type: "TEACHER_TO_INSTITUTION" | "FAMILY_TO_CLASSROOM";
   status: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
-  email: string;
+  email: string;              // email del invitado
   institutionId?: string;
   classroomId?: string;
   createdBy: string;          // authUserId de quien invitó
-  usedBy?: string;            // authUserId de quien aceptó
   expiresAt?: string;
   createdAt: string;
 }
@@ -814,16 +833,26 @@ Redis Pub/Sub. Los eventos se publican desde Classroom y Analytics reacciona.
 |--------|-----------|------------|-------|
 | `user.created` | Auth | Notifications | `{ authUserId, email, fullName, role }` |
 | `user.role_changed` | Auth | Users | `{ authUserId, newRole }` |
+| `institution.created` | Classroom | — | `{ id, name, directorId }` |
+| `institution.updated` | Classroom | — | `{ id, name }` |
+| `institution.deleted` | Classroom | — | `{ id }` |
+| `course.created` | Classroom | — | `{ id, name, classroomId }` |
+| `classroom.created` | Classroom | — | `{ id, name, teacherId, institutionId? }` |
+| `classroom.updated` | Classroom | — | `{ id, name, teacherId }` |
+| `classroom.deleted` | Classroom | — | `{ id }` |
+| `student.created` | Classroom | — | `{ id, fullName, familiarId }` |
+| `student.unenrolled` | Classroom | — | `{ id, studentId, classroomId }` |
+| `enrollment.created` | Classroom | — | `{ id, classroomId, studentId, familiarId }` |
+| `invitation.created` | Classroom | Notifications | `{ id, token, type, email, classroomName? }` |
+| `invitation.accepted` | Classroom | Notifications | `{ invitationId, type, usedBy, createdBy, email }` |
 | `attendance.registered` | Classroom | Analytics | `{ studentId, classroomId, status, date }` |
 | `attendance.updated` | Classroom | Analytics | `{ studentId, classroomId, status, previousStatus, date }` |
 | `attendance.batch.registered` | Classroom | Analytics | `{ classroomId, date, count, teacherId }` |
 | `grade.registered` | Classroom | Analytics | `{ studentId, courseId, classroomId, score, evaluation }` |
 | `grade.updated` | Classroom | Analytics | `{ studentId, courseId, classroomId, score, evaluation }` |
 | `competency.evaluated` | Classroom | Analytics | `{ studentId, courseId, classroomId, competencyId, level }` |
-| `invitation.created` | Classroom | Notifications | `{ id, token, type, email, classroomName? }` |
-| `invitation.accepted` | Classroom | Notifications | `{ invitationId, type, usedBy, createdBy, email }` |
-| `student.created` | Classroom | — | `{ id, fullName, familiarId }` |
-| `enrollment.created` | Classroom | — | `{ id, classroomId, studentId, familiarId }` |
+| `risk.detected` | Analytics | — | `{ studentId, classroomId, level, reasons }` |
+| `accessibility.pipeline.completed` | Accessibility | — | `{ jobId, status }` |
 
 ---
 
@@ -899,7 +928,6 @@ Redis Pub/Sub. Los eventos se publican desde Classroom y Analytics reacciona.
 
 | Origen | Destino | Endpoint | Propósito |
 |--------|---------|----------|-----------|
-| Classroom | Auth | `POST /internal/register` | Crear cuenta al aceptar invitación docente |
 | AI | Classroom | `GET /internal/classroom/:id` | Obtener aula para reporte semanal |
 | AI | Classroom | `GET /internal/classroom/:id/attendances` | Asistencia para reporte |
 | AI | Classroom | `GET /internal/classroom/:id/grades` | Notas para reporte |
@@ -938,24 +966,31 @@ Redis Pub/Sub. Los eventos se publican desde Classroom y Analytics reacciona.
 ### Flujo 2: DIRECTIVO — Crear institución e invitar docente
 
 ```
-1. POST /api/classroom/institutions
+1. El DOCENTE se registra primero:
+   POST /api/auth/register
+   Body: { email: "docente@minedu.edu.pe", password: "...", fullName: "María López", role: "DOCENTE" }
+   → { accessToken, user }
+
+2. El DIRECTIVO crea la institución:
+   POST /api/classroom/institutions
    Body: { name: "IE San Martín", code: "0912345" }
    → Institution
 
-2. POST /api/classroom/invitations/teacher
-   Body: { email: "docente@minedu.edu.pe", institutionId: "..." }
+3. El DIRECTIVO invita al docente:
+   POST /api/classroom/invitations
+   Body: { email: "docente@minedu.edu.pe", type: "TEACHER_TO_INSTITUTION", institutionId: "..." }
    → Invitation { token: "abc123..." }
 
-3. → Se envía email automáticamente con link: /invitations/abc123...
+4. → Se envía email automáticamente con link: /invitations/abc123...
 
-4. El DOCENTE abre el link y hace POST:
+5. El docente abre el link (puede sin JWT):
+   GET /api/classroom/invitations/token/abc123
+   → Invitation (detalles de la invitación)
+
+6. El docente acepta (con su JWT):
    POST /api/classroom/invitations/accept/teacher
-   Body: { token: "abc123...", email: "docente@minedu.edu.pe", password: "...", fullName: "María López" }
-   → Se crea AuthUser + InstitutionTeacher + se importan aulas independientes
-
-5. El DOCENTE hace login:
-   POST /api/auth/login
-   → { accessToken }
+   Body: { token: "abc123..." }
+   → Se crea InstitutionTeacher + se importan aulas independientes
 ```
 
 ### Flujo 3: DOCENTE — Crear aula, curso, invitar familiar
@@ -1007,7 +1042,7 @@ Redis Pub/Sub. Los eventos se publican desde Classroom y Analytics reacciona.
 ### Flujo 4: FAMILIAR — Registrar hijo y aceptar invitación
 
 ```
-1. Registrar hijo:
+1. Registrar hijo (con JWT):
    POST /api/classroom/students
    Body: {
      fullName: "Juan Pérez",
@@ -1020,16 +1055,20 @@ Redis Pub/Sub. Los eventos se publican desde Classroom y Analytics reacciona.
    }
    → Student { id: "student-uuid" }
 
-2. Aceptar invitación (del email):
+2. Abrir link del email (puede sin JWT):
+   GET /api/classroom/invitations/token/xyz789
+   → Invitation (detalles)
+
+3. Aceptar invitación (con JWT):
    POST /api/classroom/invitations/accept/family
    Body: { token: "xyz789...", studentId: "student-uuid" }
    → Enrollment
 
-3. Ver notas de su hijo:
+4. Ver notas de su hijo:
    GET /api/classroom/grades/student/student-uuid
    → Grade[]
 
-4. Ver asistencia de su hijo:
+5. Ver asistencia de su hijo:
    GET /api/classroom/attendance/student/student-uuid
    → Attendance[]
 ```

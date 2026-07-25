@@ -21,6 +21,7 @@ Emite y valida credenciales. **No guarda el perfil del usuario** (eso es respons
 - `POST /register` — crea `AuthUser`, llama a Users internamente (`UsersClientService` → `POST /internal` en Users) para crear el perfil, publica `user.created`, devuelve `{ accessToken, user }`.
 - `POST /login` — `LocalAuthGuard` (Passport local strategy) + devuelve `{ accessToken, user }`.
 - `PATCH /:authUserId/role` (`ADMIN`) — único endpoint del sistema que cambia el rol de un usuario. Actualiza `AuthUser.role` (la fuente que se firma en el JWT), publica `user.role_changed` para que Users sincronice su copia, y escribe `auth:role-version:<authUserId>` en Redis (TTL = `JWT_EXPIRES_IN`) para invalidar cualquier JWT emitido antes del cambio — ver [invalidación de sesión](#invalidación-de-sesión-por-cambio-de-rol).
+- `POST /internal/register` (`InternalKeyGuard`) — registro interno usado por Classroom al aceptar una invitación de DIRECTIVO→DOCENTE (crea `AuthUser` + perfil de Users, devuelve `{ accessToken, user }`). *Nota*: el `acceptTeacherInvitation` actualmente **no** llama a este endpoint — el docente ya tiene cuenta propia. Este endpoint queda disponible si se necesita en el futuro.
 - Depende de: **Users** (interno, síncrono, bloqueante — si Users no responde, el registro falla), **Redis** (pub/sub + versión de rol, no bloqueante — un fallo de Redis no bloquea el registro ni el cambio de rol, solo hace fail-open la invalidación de sesión).
 - Publica: `user.created`, `user.role_changed`.
 - **Roles (remodelado 2026-07-25)**: `ADMIN | DIRECTIVO | DOCENTE | FAMILIAR`. Ya no existen `ESPECIALISTA` ni `ESTUDIANTE` (el estudiante no es usuario — es un registro `Student` en Classroom, creado por su FAMILIAR). Registrar con un rol viejo devuelve 400 (`@IsEnum(Role)` en `RegisterDto`).
@@ -60,30 +61,125 @@ Guarda archivos binarios (subidos por usuarios o generados por otros servicios: 
 - `GET /` (JWT) — notificaciones del usuario autenticado.
 - `PATCH /:id/read` (JWT).
 - Se suscribe a `user.created` (`events-subscriber.service.ts`) → encola notificación de bienvenida vía BullMQ (cola `notifications`) → `NotificationsProcessor` persiste en Postgres y empuja por WebSocket.
+- Se suscribe a `invitation.created` (`events-subscriber.service.ts`) → envía email de invitación vía `EmailService` (Nodemailer SMTP). Template distinto según `type` (docente o familiar).
+- Se suscribe a `invitation.accepted` (`events-subscriber.service.ts`) → encola notificación in-app al que creó la invitación.
+- **Email transaccional** (`apps/notifications/src/email/`): módulo `EmailModule` con `EmailService` que usa Nodemailer (`SMTP_HOST`/`SMTP_PORT`/`SMTP_SECURE`/`SMTP_USER`/`SMTP_PASS`/`SMTP_FROM`). Templates HTML en `apps/notifications/src/email/templates/`:
+  - `teacher-invitation.ts` — invitación DIRECTIVO→DOCENTE (asociar a Institución Educativa). Subject: `{institutionName} — te invita a unirte como docente`.
+  - `family-invitation.ts` — invitación DOCENTE→FAMILIAR (matricular hijo en un aula). Subject: `{classroomName} — invitación para matricular a tu hijo`.
+  - Variables de entorno: `FRONTEND_URL` (base del link de aceptación), `SMTP_*`.
 - **WebSocket namespace `/notifications`, path `/ws/notifications`**, autenticado con el JWT en `handshake.auth.token`. El cliente se conecta a través del **Gateway** (`io('http://<gateway-host>:3000/notifications', { path: '/ws/notifications', auth: { token } })`) — el Gateway proxya el `upgrade` hacia `NOTIFICATIONS_SERVICE_URL`, que ya no está publicado directamente (puerto `3004` sin `ports:` en `docker-compose.yml`, solo alcanzable dentro de la red Docker).
 
 ## Classroom — puerto 3006, DB `classroom_db`
 
-El dominio operacional principal. **Remodelado a nivel de BD el 2026-07-25** (ver [DATABASE.md](./DATABASE.md#classroom_db--classroom-11-modelos-el-esquema-más-grande)): ahora es **Institution (IE, del DIRECTIVO) → Classroom (aula, del DOCENTE) → Course (curso)**, con estudiantes como registros (`Student`, creados por su FAMILIAR, ya no usuarios), matrícula por `Enrollment` al aula vía invitaciones por link, asistencia por aula y notas/competencias por curso. Fuente de verdad para Analytics, AI, Reports y Accessibility.
+El dominio operacional principal. **Remodelado 2026-07-25**: Institution (IE, solo DIRECTIVO) → Classroom (aula, DOCENTE) → Course (curso). Estudiantes como registros (`Student`, creados por su FAMILIAR, no usuarios), matrícula por `Enrollment` vía invitaciones por link. Fuente de verdad para Analytics, AI, Reports y Accessibility.
 
-**⚠️ Los controladores actuales corresponden al modelo viejo y están pendientes de adaptación** (no compilan contra el schema nuevo — ver la sección de refactor en [PENDING.md](./PENDING.md)). Estado actual del código:
+### Institution (`/institutions`)
 
-- `CourseController` (`/courses`) — obsoleto: asume `gradeLevel`/`teacherId` en Course (ahora viven en Classroom) y no exige `classroomId`.
-- `ClassroomController` (`/classrooms`) — obsoleto: `enroll`/`unenroll` con rol `ESTUDIANTE` (ya no existe) sobre el array `studentIds` (reemplazado por `Enrollment`+`Invitation`).
-- `AttendanceController` (`/attendance`) — mayormente vigente (la asistencia sigue por aula), pero `studentId` ahora es `Student.id`.
-- `GradeController` (`/grades`) — obsoleto en parte: las notas ahora referencian `courseId`, no `classroomId`.
-- `CompetencyController` (`/competencies`) — ídem (por curso ahora).
-- `SupportNeedController` (`/support-needs`) — vigente en espíritu, pero `studentId` ahora es `Student.id` (FK real) y los guards referencian `ESPECIALISTA` (rol eliminado); falta decidir el acceso del `FAMILIAR` a las necesidades de su propio hijo.
-- `InternalController` (`/internal`) — contratos a re-validar: `GET /internal/classroom/:id/grades` ahora implica agregar las notas de los cursos del aula.
-- **Endpoints nuevos por construir** (otro dev): CRUD de `Institution` (solo DIRECTIVO), invitaciones (crear/aceptar/revocar, tipos `TEACHER_TO_INSTITUTION` y `FAMILY_TO_CLASSROOM`), registro de `Student` por el FAMILIAR (con sus necesidades de apoyo), matrícula vía aceptación de invitación (1 hijo por link). Los DOCENTEs pueden crear aulas **sin pertenecer a ninguna IE** (`institutionId = null`, aula independiente); al aceptar una invitación de IE, sus aulas independientes se importan a esa institución.
+- CRUD completo, solo `DIRECTIVO` crea y administra IEs.
+- `GET /` — `ADMIN` ve todas las IEs; `DIRECTIVO` ve solo las suyas.
+- `POST /` (solo `DIRECTIVO`).
+- `GET /:id`, `PATCH /:id`, `DELETE /:id` — solo la IE propia (`institutionId` del JWT).
+- Publica: `institution.created`, `institution.updated`, `institution.deleted`.
 
-Publica 11 eventos (catálogo abajo) — los payloads de nota/competencia necesitarán incluir `classroomId` resuelto vía `Course` para que Analytics siga funcionando (pendiente).
+### Classroom (`/classrooms`)
+
+- **`findAll(userRole, userId)`** — filtrado por ownership:
+  - `ADMIN`: todas las aulas.
+  - `DIRECTIVO`: solo aulas de sus instituciones (`institutionId` match).
+  - `DOCENTE`: solo aulas propias (`teacherId` match).
+  - `FAMILIAR`: solo aulas donde tiene hijos matriculados (via `Enrollment.student.familiarId`).
+- `POST /` — `name` + `gradeLevel` + `institutionId?` (opcional, crear aula independiente).
+- `GET /:id`, `PATCH /:id`, `DELETE /:id` — ownership check: `classroom.teacherId === userId` (o `ADMIN`).
+- `GET /:id/courses` — cursos del aula.
+- Publica: `classroom.created`, `classroom.updated`, `classroom.deleted`.
+
+### Course (`/courses`)
+
+- `POST /`, `GET /`, `GET /:id`, `PATCH /:id`, `DELETE /:id`.
+- Relación invertida: `classroomId` en el body de creación (Course pertenece a Classroom).
+- Publica: `course.created`.
+
+### Grade (`/grades`)
+
+- `POST /` — `studentId` + `courseId` + `score` + `period`. Ownership check: courseId → classroom → teacherId.
+- `GET /classroom/:id` — notas por aula (via courses).
+- `GET /student/:id` — notas por estudiante.
+- `GET /:id`, `PATCH /:id`, `DELETE /:id`.
+- FAMILIAR puede leer notas de sus hijos (`/classroom/:id`, `/student/:id`).
+- Publica: `grade.registered`, `grade.updated`.
+
+### Competency (`/competencies`)
+
+- `POST /` — `studentId` + `courseId` + `competencyName` + `score` + `period`. Ownership check: courseId → classroom → teacherId.
+- `GET /classroom/:id` — competencias por aula.
+- `GET /student/:id` — competencias por estudiante.
+- `GET /:id`, `PATCH /:id`, `DELETE /:id`.
+- FAMILIAR puede leer competencias de sus hijos.
+- Publica: `competency.evaluated`.
+
+### Attendance (`/attendance`)
+
+- `POST /` — `studentId` + `classroomId` + `date` + `status` + `notes?`. Ownership check: classroom → teacherId.
+- `GET /classroom/:id` — asistencia por aula.
+- `GET /student/:id` — asistencia por estudiante.
+- `GET /:id`, `PATCH /:id`.
+- FAMILIAR puede leer asistencia de sus hijos.
+- Publica: `attendance.registered`, `attendance.updated`, `attendance.batch.registered`.
+
+### Enrollment (`/enrollments`)
+
+- Creado automáticamente al aceptar una invitación `FAMILY_TO_CLASSROOM`.
+- `GET /classroom/:id` — matrícululas del aula.
+- `GET /student/:id` — matrícululas de un estudiante.
+- `DELETE /:id` — desmatricular.
+- Publica: `enrollment.created`.
+
+### Invitation (`/invitations`)
+
+- `POST /` (DOCENTE) — crear invitación. Body: `{ email, type, classroomId?, institutionId? }`.
+  - `TEACHER_TO_INSTITUTION`: asociar un docente a una IE. Email y `institutionId` obligatorios.
+  - `FAMILY_TO_CLASSROOM`: matricular un hijo en un aula. Email y `classroomId` obligatorios.
+- `GET /` — listar invitaciones propias.
+- `GET /token/:token` (**público**, sin JWT) — ver detalles de la invitación desde el link del email.
+- `POST /accept/teacher` (**público**, sin JWT) — aceptar invitación docente. El docente ya tiene cuenta; solo se crea `InstitutionTeacher` y se importan aulas independientes. Verifica que el JWT coincida con el email de la invitación (pendiente — ver PENDING).
+- `POST /accept/family` (JWT) — aceptar invitación familiar. Body: `{ token, studentId }` — crea `Enrollment`.
+- `POST /revoke/:id` (JWT) — revocar invitación.
+- Publica: `invitation.created`, `invitation.accepted`.
+
+### Student (`/students`)
+
+- `POST /` (FAMILIAR) — registrar un hijo. Body: `{ name, birthDate?, dni?, familiarId, supportNeeds? }`.
+  - `supportNeeds`: array opcional `[{ type: SupportNeedType, level: SupportLevel, description? }]`.
+- `GET /familiar/:familiarId` (FAMILIAR) — hijos de un familiar.
+- `GET /:id` — datos del estudiante.
+- `PATCH /:id` (FAMILIAR) — actualizar datos del hijo.
+- `DELETE /:id` (FAMILIAR) — eliminar registro de estudiante.
+- Publica: `student.created`.
+
+### Support Need (`/support-needs`)
+
+- CRUD para necesidades de apoyo de un estudiante (opcional, vinculado a `Student`).
+- `POST /`, `GET /student/:studentId`, `GET /:id`, `PATCH /:id`, `DELETE /:id`.
+
+### Internal (`/internal`)
+
+- `GET /classrooms` — todas las aulas (con `courses` y `enrollments: { include: { student: true } }`).
+- `GET /classroom/:id` — una aula con sus cursos y matrículas.
+- `GET /classroom/:id/attendances` — asistencias del aula.
+- `GET /classroom/:id/grades` — notas del aula (via courses).
+- `GET /courses/classroom/:id` — cursos de un aula.
+- `GET /enrollments/classroom/:id` — matrícululas de un aula.
+- `GET /students/familiar/:familiarId` — hijos de un familiar.
+- `GET /support-needs/student/:studentId` — necesidades de apoyo de un estudiante.
+- Todos protegidos con `InternalKeyGuard`.
+
+Publica 19 eventos (catálogo abajo).
 
 ## Analytics ("Gemelo Digital") — puerto 3007, DB `analytics_db`
 
 No expone escritura pública — se recalcula reactivamente a partir de eventos de Classroom.
 
-- `IndicatorsController` (`/indicators`) — `GET /indicators/classroom/:id`, `GET /indicators/student/:id/classroom/:id`, `GET /indicators/student/:id`. **Nota**: los guards de este servicio aún referencian `ESTUDIANTE`/`ESPECIALISTA` (roles eliminados el 2026-07-25) — el acceso "self del estudiante" desaparece o pasa al `FAMILIAR`; limpieza pendiente (ver PENDING).
+- `IndicatorsController` (`/indicators`) — `GET /indicators/classroom/:id`, `GET /indicators/student/:id/classroom/:id`, `GET /indicators/student/:id`.
 - `DigitalTwinController` (`/digital-twin`) — vista agregada por aula o por estudiante (`GET /digital-twin/classroom/:id`, `GET /digital-twin/classroom/:id/student/:id`).
 - `RecommendationController` (`/recommendations`) — lectura + `PATCH /recommendations/:id/dismiss`.
 - `InternalController` (`/internal`, `InternalKeyGuard`) — `GET /internal/indicators/classroom/:id`, `GET /internal/risk/classroom/:id`, `GET /internal/recommendations/classroom/:id`. **Consumido por AI y Reports.**
@@ -110,7 +206,6 @@ Pipeline de accesibilidad para material educativo: OCR → adaptación de texto 
 - **Fichas didácticas** (`processWorksheet`, agregado 2026-07-25 para el desafío de Educación Básica Especial de la Categoría A — ver `docs/hackathon-bases-2026.pdf`): reusa el pipeline base para obtener `adaptedText`+`pictogramData`, y si el request trae `studentId` consulta `GET /internal/support-needs/student/:studentId` en Classroom (`CLASSROOM_SERVICE_INTERNAL_URL`, fail-open — si Classroom no responde la ficha igual se genera, sin personalizar). Le pide a `AdaptationService.generateWorksheet()` (Groq, prompt distinto al de lectura fácil) reestructurar el texto en una ficha JSON (`{title, instructions, exercises[]}`, tipos `opcion_multiple`/`verdadero_falso`/`completar`) — si hay necesidades de apoyo registradas, el prompt agrega una guía por tipo (`SUPPORT_NEED_GUIDANCE` en `adaptation.service.ts`, ej. TEA → instrucciones literales sin lenguaje figurado). `worksheet-pdf.util.ts` maquetea el resultado con `pdfkit` (título, palabras clave con imágenes de pictogramas, ejercicios con espacio de respuesta) y lo sube a Storage. Persiste `worksheetFileId`/`worksheetContent` en el mismo `AccessibilityJob`.
 - Depende de: **Storage** (interno, descarga + upload), **Classroom** (interno, solo para `process/worksheet` con `studentId`, opcional/fail-open), **Groq** (API externa, requiere `GROQ_API_KEY` real — sin ella el servicio no arranca, Joi la exige), **ElevenLabs** (API externa, requiere `ELEVENLABS_API_KEY` real — sin ella el servicio no arranca, Joi la exige), **ARASAAC** (API pública, no requiere key, fallback silencioso si falla).
 - Publica `accessibility.pipeline.completed`. Nadie se suscribe a este evento todavía.
-- **Nota (remodelado 2026-07-25)**: los guards referencian `ESPECIALISTA` (rol eliminado) y `GenerateWorksheetDto.studentId` ahora significa `Student.id` de classroom_db (antes authUserId) — limpieza pendiente (ver PENDING).
 
 ## Reports — puerto 3005, DB `reports_db`
 
@@ -143,17 +238,24 @@ Coexisten a propósito, con alcance distinto — si tocas la lógica de agregaci
 
 ## Catálogo de eventos
 
-Definidos en `packages/common/src/events/event-names.ts` (`EVENTS`). Los 15 están todos publicados por al menos un servicio; todos tienen al menos un subscriber activo excepto `attendance.batch.registered`, `risk.detected` y `accessibility.pipeline.completed`.
+Definidos en `packages/common/src/events/event-names.ts` (`EVENTS`). Los 19 están todos publicados por al menos un servicio; todos tienen al menos un subscriber activo excepto `attendance.batch.registered`, `risk.detected`, `accessibility.pipeline.completed`, `institution.created`, `institution.updated`, `institution.deleted`, `course.created`, `classroom.created`, `classroom.updated`, `classroom.deleted`, `student.created` y `student.unenrolled`.
 
 | Evento | Publica | Se suscribe |
 |---|---|---|
 | `user.created` | Auth | Notifications (notificación de bienvenida) |
 | `user.role_changed` | Auth | Users (sincroniza su copia de `role`) |
+| `institution.created` | Classroom | — |
+| `institution.updated` | Classroom | — |
+| `institution.deleted` | Classroom | — |
 | `course.created` | Classroom | — |
 | `classroom.created` | Classroom | — |
 | `classroom.updated` | Classroom | — |
-| `student.enrolled` | Classroom | — |
+| `classroom.deleted` | Classroom | — |
+| `student.created` | Classroom | — |
 | `student.unenrolled` | Classroom | — |
+| `enrollment.created` | Classroom | — |
+| `invitation.created` | Classroom | Notifications (envía email de invitación) |
+| `invitation.accepted` | Classroom | Notifications (notificación in-app al creador) |
 | `attendance.registered` | Classroom | Analytics (recalcula indicador + riesgo) |
 | `attendance.updated` | Classroom | Analytics (recalcula indicador + riesgo) |
 | `attendance.batch.registered` | Classroom | — |
