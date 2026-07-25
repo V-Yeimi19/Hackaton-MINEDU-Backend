@@ -207,7 +207,7 @@ erDiagram
         string fileType
         JobStatus status
         string originalText "nullable, texto extraido por OCR"
-        string adaptedText "nullable, lectura facil generada por OpenAI"
+        string adaptedText "nullable, lectura facil generada por Groq (llama-3.3-70b-versatile)"
         string summaryText "nullable"
         string audioFileId "nullable, no se usa todavia"
         string subtitlesFileId "nullable, no se usa todavia"

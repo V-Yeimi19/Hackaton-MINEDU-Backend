@@ -5,7 +5,7 @@ export const envValidationSchema = Joi.object({
   DATABASE_URL: Joi.string().required(),
   JWT_SECRET: Joi.string().required(),
   INTERNAL_API_KEY: Joi.string().required(),
-  OPENAI_API_KEY: Joi.string().required(),
+  GROQ_API_KEY: Joi.string().required(),
   STORAGE_SERVICE_INTERNAL_URL: Joi.string().uri().required(),
   REDIS_URL: Joi.string().default('redis://localhost:6379'),
 });

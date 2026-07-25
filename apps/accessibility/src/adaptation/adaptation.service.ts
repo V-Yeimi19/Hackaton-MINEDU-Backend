@@ -9,7 +9,8 @@ export class AdaptationService {
 
   constructor(private config: ConfigService) {
     this.openai = new OpenAI({
-      apiKey: this.config.get<string>('OPENAI_API_KEY'),
+      apiKey: this.config.get<string>('GROQ_API_KEY'),
+      baseURL: 'https://api.groq.com/openai/v1',
     });
   }
 
@@ -25,7 +26,7 @@ export class AdaptationService {
     const instruction = levelInstructions[level] ?? levelInstructions.MODERADO;
 
     const response = await this.openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'llama-3.3-70b-versatile',
       messages: [
         {
           role: 'system',
@@ -47,7 +48,7 @@ export class AdaptationService {
     this.logger.log('Generando resumen del contenido');
 
     const response = await this.openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'llama-3.3-70b-versatile',
       messages: [
         {
           role: 'system',

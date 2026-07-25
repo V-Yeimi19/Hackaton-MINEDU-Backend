@@ -14,7 +14,7 @@ RUN pnpm --filter accessibility build
 
 FROM node:22-alpine AS runtime
 RUN corepack enable
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl espeak-ng
 WORKDIR /repo
 
 COPY --from=build /repo ./

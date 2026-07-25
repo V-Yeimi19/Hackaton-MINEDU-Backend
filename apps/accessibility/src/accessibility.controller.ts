@@ -24,8 +24,8 @@ export class AccessibilityController {
   async processAndReturnAudio(@Body() dto: ProcessContentDto, @Res() res: Response) {
     const result = await this.pipelineService.process(dto);
     res.set({
-      'Content-Type': 'audio/mpeg',
-      'Content-Disposition': `attachment; filename="audio-${result.job?.id}.mp3"`,
+      'Content-Type': 'audio/wav',
+      'Content-Disposition': `attachment; filename="audio-${result.job?.id}.wav"`,
     });
     res.send(result.audioBuffer);
   }

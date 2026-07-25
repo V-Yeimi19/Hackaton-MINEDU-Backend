@@ -100,8 +100,8 @@ Reporte PDF semanal **de una sola aula**, generado bajo demanda o por cron.
 Pipeline de accesibilidad para material educativo: OCR → adaptación de texto → texto-a-voz.
 
 - `AccessibilityController` (`@Controller()` vacío) — `POST /process` (body `{ fileId, fileName, fileType, adaptationLevel }`), `POST /process/audio` (mismo pipeline, devuelve el audio directo), `GET /jobs`, `GET /jobs/:id`.
-- Pipeline (`pipeline.service.ts`): descarga el archivo de Storage (interno) → `OcrService` (`tesseract.js`, solo si el mimetype lo requiere) → `AdaptationService` (OpenAI: lectura fácil + resumen) → `AudioService` (texto-a-voz) → persiste `AccessibilityJob` → publica `accessibility.pipeline.completed`.
-- Depende de: **Storage** (interno, descarga), **OpenAI** (API externa, requiere `OPENAI_API_KEY` real — con una key placeholder el servicio arranca pero el paso de adaptación fallará).
+- Pipeline (`pipeline.service.ts`): descarga el archivo de Storage (interno) → `OcrService` (`tesseract.js`, solo si el mimetype lo requiere) → `AdaptationService` (Groq, `llama-3.3-70b-versatile` vía el SDK de `openai` apuntando a `https://api.groq.com/openai/v1`: lectura fácil + resumen) → `AudioService` (`espeak-ng` local, voz `es`, sin costo ni API externa — genera WAV, no mp3) → persiste `AccessibilityJob` → publica `accessibility.pipeline.completed`.
+- Depende de: **Storage** (interno, descarga), **Groq** (API externa, requiere `GROQ_API_KEY` real — sin ella el servicio no arranca, Joi la exige). El texto-a-voz no depende de ningún servicio externo.
 - Publica `accessibility.pipeline.completed`. Nadie se suscribe a este evento todavía.
 
 ## Reports — puerto 3005, DB `reports_db`
