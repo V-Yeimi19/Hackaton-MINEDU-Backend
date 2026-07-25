@@ -14,12 +14,10 @@ function formatTimestamp(seconds: number): string {
   );
 }
 
-export function getAudioDurationFromWav(buffer: Buffer): number {
-  if (buffer.length < 44) return 1;
-  const byteRate = buffer.readUInt32LE(28);
-  if (byteRate === 0) return 1;
-  const dataSize = buffer.readUInt32LE(40);
-  return dataSize / byteRate;
+const CHARS_PER_SECOND = 15;
+
+export function estimateSpeechDuration(text: string): number {
+  return Math.max(1, text.length / CHARS_PER_SECOND);
 }
 
 export function generateSrt(text: string, durationSeconds: number): string {

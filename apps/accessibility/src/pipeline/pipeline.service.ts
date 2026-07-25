@@ -10,7 +10,7 @@ import { AudioService } from '../audio/audio.service';
 import { ProcessContentDto, AdaptationLevel } from './dto/pipeline.dto';
 import { EVENTS, RedisPubSubService } from '@minedu/common';
 import { PictogramService } from './pictogram.service';
-import { generateSrt, getAudioDurationFromWav } from './srt.util';
+import { generateSrt, estimateSpeechDuration } from './srt.util';
 
 @Injectable()
 export class PipelineService {
@@ -131,12 +131,12 @@ export class PipelineService {
       this.logger.log(`[${job.id}] Subiendo audio a Storage...`);
       const audioFileId = await this.uploadToStorage(
         audioBuffer,
-        `audio-${job.id}.wav`,
-        'audio/wav',
+        `audio-${job.id}.mp3`,
+        'audio/mpeg',
       );
 
       this.logger.log(`[${job.id}] Generando subtítulos...`);
-      const duration = getAudioDurationFromWav(audioBuffer);
+      const duration = estimateSpeechDuration(adaptedText);
       const srtContent = generateSrt(adaptedText, duration);
       const subtitlesFileId = await this.uploadToStorage(
         Buffer.from(srtContent, 'utf-8'),

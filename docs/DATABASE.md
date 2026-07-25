@@ -212,7 +212,7 @@ erDiagram
         string originalText "nullable, texto extraido por OCR"
         string adaptedText "nullable, lectura facil generada por Groq (llama-3.3-70b-versatile)"
         string summaryText "nullable"
-        string audioFileId "nullable, id del WAV en storage_db, generado por ElevenLabs"
+        string audioFileId "nullable, id del MP3 en storage_db, generado por ElevenLabs"
         string subtitlesFileId "nullable, id del SRT en storage_db, generado con timestamps proporcionales"
         json pictogramData "nullable, array de {keyword, arasaacId, imageUrl} de la API ARASAAC"
         AdaptationLevel adaptationLevel
@@ -222,7 +222,7 @@ erDiagram
     }
 ```
 
-`JobStatus` = `PENDING | PROCESSING | COMPLETED | FAILED`. `AdaptationLevel` = `LEVE | MODERADO | SIGNIFICATIVO`. Los tres campos de salida (`audioFileId`, `subtitlesFileId`, `pictogramData`) se poblan al completar el pipeline: el audio se sube a Storage vía `POST /internal/upload` (base64 JSON), el SRT se genera con `srt.util.ts` (timestamps proporcionales basados en la duración del WAV calculada desde el header), y los pictogramas se obtienen de la API pública de ARASAAC (hasta 10 keywords más frecuentes del texto adaptado, excluyendo stop words en español).
+`JobStatus` = `PENDING | PROCESSING | COMPLETED | FAILED`. `AdaptationLevel` = `LEVE | MODERADO | SIGNIFICATIVO`. Los tres campos de salida (`audioFileId`, `subtitlesFileId`, `pictogramData`) se poblan al completar el pipeline: el audio (MP3, generado por ElevenLabs) se sube a Storage vía `POST /internal/upload` (base64 JSON), el SRT se genera con `srt.util.ts` (timestamps proporcionales basados en una duración estimada por velocidad de habla, no en el audio en sí — parsear duración real de un MP3 requeriría decodificar frames, no solo leer un header como en WAV), y los pictogramas se obtienen de la API pública de ARASAAC (hasta 10 keywords más frecuentes del texto adaptado, excluyendo stop words en español).
 
 ## `reports_db` — Reports
 
