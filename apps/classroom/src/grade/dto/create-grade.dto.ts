@@ -1,8 +1,7 @@
 import { IsNotEmpty, IsString, IsUUID, IsNumber, Min, Max } from 'class-validator';
 
 export class CreateGradeDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   studentId: string;
 
   @IsUUID()

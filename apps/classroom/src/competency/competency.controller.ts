@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard, RolesGuard, Roles, Role } from '@minedu/common';
+import { JwtAuthGuard, JwtPayload, RolesGuard, Roles, Role, CurrentUser } from '@minedu/common';
 import { CompetencyService } from './competency.service';
 import { CreateCompetencyDto } from './dto/create-competency.dto';
 import { EvaluateCompetencyDto } from './dto/evaluate-competency.dto';
@@ -10,7 +10,7 @@ export class CompetencyController {
   constructor(private readonly competencyService: CompetencyService) {}
 
   @Post()
-  @Roles(Role.DOCENTE, Role.ADMIN)
+  @Roles(Role.DOCENTE)
   create(@Body() dto: CreateCompetencyDto) {
     return this.competencyService.create(dto);
   }
@@ -22,9 +22,9 @@ export class CompetencyController {
   }
 
   @Get('student/:studentId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  findByStudent(@Param('studentId') studentId: string) {
-    return this.competencyService.findByStudent(studentId);
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
+  findByStudent(@Param('studentId') studentId: string, @CurrentUser() user: JwtPayload) {
+    return this.competencyService.findByStudent(studentId, user.sub, user.role);
   }
 
   @Get(':id')
@@ -35,7 +35,7 @@ export class CompetencyController {
 
   @Post('evaluate')
   @Roles(Role.DOCENTE, Role.ADMIN)
-  evaluate(@Body() dto: EvaluateCompetencyDto) {
-    return this.competencyService.evaluate(dto);
+  evaluate(@Body() dto: EvaluateCompetencyDto, @CurrentUser() user: JwtPayload) {
+    return this.competencyService.evaluate(dto, user.sub, user.role);
   }
 }

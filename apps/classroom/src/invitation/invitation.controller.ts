@@ -34,7 +34,7 @@ export class InvitationController {
     @Body() dto: AcceptTeacherInvitationDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.invitationService.acceptTeacherInvitation(dto, user.sub);
+    return this.invitationService.acceptTeacherInvitation(dto, user.sub, user.email);
   }
 
   @Post('accept/family')
@@ -62,6 +62,12 @@ export class InvitationController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.invitationService.findPendingByClassroom(classroomId, user.sub);
+  }
+
+  @Get()
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
+  findByUser(@CurrentUser() user: JwtPayload) {
+    return this.invitationService.findByUser(user.sub);
   }
 
   @Patch(':id/revoke')

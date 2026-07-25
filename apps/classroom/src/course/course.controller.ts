@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard, RolesGuard, Roles, Role } from '@minedu/common';
+import { JwtAuthGuard, JwtPayload, RolesGuard, Roles, Role, CurrentUser } from '@minedu/common';
 import { CourseService } from './course.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -11,8 +11,8 @@ export class CourseController {
 
   @Post()
   @Roles(Role.DOCENTE, Role.ADMIN)
-  create(@Body() dto: CreateCourseDto) {
-    return this.courseService.create(dto);
+  create(@Body() dto: CreateCourseDto, @CurrentUser() user: JwtPayload) {
+    return this.courseService.create(dto, user.sub, user.role);
   }
 
   @Get()
@@ -29,13 +29,13 @@ export class CourseController {
 
   @Patch(':id')
   @Roles(Role.DOCENTE, Role.ADMIN)
-  update(@Param('id') id: string, @Body() dto: UpdateCourseDto) {
-    return this.courseService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateCourseDto, @CurrentUser() user: JwtPayload) {
+    return this.courseService.update(id, dto, user.sub, user.role);
   }
 
   @Delete(':id')
   @Roles(Role.DOCENTE, Role.ADMIN)
-  remove(@Param('id') id: string) {
-    return this.courseService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.courseService.remove(id, user.sub, user.role);
   }
 }

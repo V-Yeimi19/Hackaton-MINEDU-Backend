@@ -10,8 +10,13 @@ interface DecodedToken {
   role: string;
 }
 
-export function createJwtCheckMiddleware(secret: string) {
+export function createJwtCheckMiddleware(secret: string, publicPaths: string[] = []) {
   return function jwtCheckMiddleware(req: Request, res: Response, next: NextFunction): void {
+    if (publicPaths.some((p) => req.url.startsWith(p))) {
+      next();
+      return;
+    }
+
     const header = req.headers.authorization;
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
 

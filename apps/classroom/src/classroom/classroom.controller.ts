@@ -12,7 +12,7 @@ export class ClassroomController {
   @Post()
   @Roles(Role.DOCENTE, Role.ADMIN)
   create(@Body() dto: CreateClassroomDto, @CurrentUser() user: JwtPayload) {
-    return this.classroomService.create(dto, user.sub);
+    return this.classroomService.create(dto, user.sub, user.role);
   }
 
   @Get()
@@ -45,8 +45,8 @@ export class ClassroomController {
 
   @Get(':id/enrollments')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  getEnrollments(@Param('id') id: string) {
-    return this.classroomService.getEnrollments(id);
+  getEnrollments(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.classroomService.getEnrollments(id, user.sub, user.role);
   }
 
   @Delete(':id/enrollments/:enrollmentId')
@@ -54,7 +54,8 @@ export class ClassroomController {
   removeEnrollment(
     @Param('id') id: string,
     @Param('enrollmentId') enrollmentId: string,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.classroomService.removeEnrollment(id, enrollmentId);
+    return this.classroomService.removeEnrollment(id, enrollmentId, user.sub, user.role);
   }
 }

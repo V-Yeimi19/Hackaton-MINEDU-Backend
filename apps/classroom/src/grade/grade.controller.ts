@@ -17,14 +17,14 @@ export class GradeController {
 
   @Get('classroom/:classroomId')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
-  findByClassroom(@Param('classroomId') classroomId: string) {
-    return this.gradeService.findByClassroom(classroomId);
+  findByClassroom(@Param('classroomId') classroomId: string, @CurrentUser() user: JwtPayload) {
+    return this.gradeService.findByClassroom(classroomId, user.sub, user.role);
   }
 
   @Get('student/:studentId')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
-  findByStudent(@Param('studentId') studentId: string) {
-    return this.gradeService.findByStudent(studentId);
+  findByStudent(@Param('studentId') studentId: string, @CurrentUser() user: JwtPayload) {
+    return this.gradeService.findByStudent(studentId, user.sub, user.role);
   }
 
   @Patch(':id')

@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export enum SupportNeedType {
   DISCAPACIDAD_VISUAL = 'DISCAPACIDAD_VISUAL',
@@ -19,8 +19,7 @@ export enum SupportLevel {
 }
 
 export class CreateSupportNeedDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   studentId: string;
 
   @IsEnum(SupportNeedType)

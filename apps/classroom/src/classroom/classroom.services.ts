@@ -13,7 +13,15 @@ export class ClassroomService {
     private pubsub: RedisPubSubService,
   ) {}
 
-  async create(dto: CreateClassroomDto, teacherId: string) {
+  async create(dto: CreateClassroomDto, teacherId: string, userRole?: string) {
+    if (dto.institutionId && userRole !== Role.ADMIN) {
+      const membership = await this.prisma.institutionTeacher.findUnique({
+        where: { institutionId_teacherId: { institutionId: dto.institutionId, teacherId } },
+      });
+      if (!membership) {
+        throw new ForbiddenException('No perteneces a esta institución');
+      }
+    }
     const classroom = await this.prisma.classroom.create({
       data: {
         name: dto.name,
@@ -106,16 +114,22 @@ export class ClassroomService {
     await this.prisma.classroom.delete({ where: { id } });
   }
 
-  async getEnrollments(classroomId: string) {
-    await this.findOne(classroomId);
+  async getEnrollments(classroomId: string, userId: string, userRole: string) {
+    const classroom = await this.findOne(classroomId);
+    if (userRole === Role.DOCENTE && classroom.teacherId !== userId) {
+      throw new ForbiddenException('No tienes permiso para ver las matrículas de este aula');
+    }
     return this.prisma.enrollment.findMany({
       where: { classroomId },
       include: { student: true },
     });
   }
 
-  async removeEnrollment(classroomId: string, enrollmentId: string) {
-    await this.findOne(classroomId);
+  async removeEnrollment(classroomId: string, enrollmentId: string, userId: string, userRole: string) {
+    const classroom = await this.findOne(classroomId);
+    if (userRole === Role.DOCENTE && classroom.teacherId !== userId) {
+      throw new ForbiddenException('No tienes permiso para modificar las matrículas de este aula');
+    }
     const enrollment = await this.prisma.enrollment.findUnique({
       where: { id: enrollmentId },
     });

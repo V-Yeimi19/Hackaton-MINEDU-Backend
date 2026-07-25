@@ -92,7 +92,7 @@ export class InvitationService {
     return invitation;
   }
 
-  async acceptTeacherInvitation(dto: AcceptTeacherInvitationDto, teacherId: string) {
+  async acceptTeacherInvitation(dto: AcceptTeacherInvitationDto, teacherId: string, userEmail: string) {
     const invitation = await this.prisma.invitation.findUnique({
       where: { token: dto.token },
     });
@@ -107,6 +107,9 @@ export class InvitationService {
     }
     if (invitation.expiresAt && invitation.expiresAt < new Date()) {
       throw new BadRequestException('La invitación ha expirado');
+    }
+    if (invitation.email !== userEmail) {
+      throw new ForbiddenException('El email de tu cuenta no coincide con la invitación');
     }
 
     const alreadyMember = await this.prisma.institutionTeacher.findUnique({
@@ -287,6 +290,13 @@ export class InvitationService {
     return this.prisma.invitation.update({
       where: { id },
       data: { status: 'REVOKED' },
+    });
+  }
+
+  async findByUser(userId: string) {
+    return this.prisma.invitation.findMany({
+      where: { createdBy: userId },
+      orderBy: { createdAt: 'desc' },
     });
   }
 

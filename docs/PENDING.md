@@ -42,17 +42,31 @@ El 2026-07-25 se remodeló el dominio a nivel de BD y el código de aplicación 
 - [x] **GradeService.update()** resuelve `classroomId` desde `courseId` antes de publicar `GRADE_UPDATED`
 - [x] **Email templates** corregidos (subject usa campo correcto, `institutionName` removido de family-invitation)
 - [x] **Limpieza de datos** — migración `cleanup_orphan_data` en analytics_db borra filas con `studentId` = authUserId viejo
+- [x] **Course/Competency ownership** — create/update/remove/evaluate verifican classroom→teacherId
+- [x] **SupportNeed ownership** — FAMILIAR solo modifica hijos propios, DOCENTE solo estudiantes en sus aulas
+- [x] **Invitation email check** — acceptTeacherInvitation verifica JWT email vs invitation email
+- [x] **createClassroom institutionId** — valida membresía en InstitutionTeacher antes de asociar IE
+- [x] **FAMILIAR data leak** — Grade/Attendance reads filtran por Enrollment.familiarId
+- [x] **Enrollment ownership** — getEnrollments/removeEnrollment verifican classroom→teacherId
+- [x] **DTOs @IsUUID** — studentId en Grade, Competency, SupportNeed usan @IsUUID()
+- [x] **Gateway public paths** — `/api/classroom/invitations/token/*` sin JWT (para links de email)
+- [x] **GET /invitations** — endpoint para listar invitaciones creadas por el usuario
+- [x] **Competency create solo ADMIN** — catálogo curricular no editable por DOCENTE
+- [x] **Competency findByStudent FAMILIAR filter** — verifica enrollment antes de devolver datos
+- [x] **API.md invitations paths** — documentación alineada con código real (`/invitations/teacher`, `/invitations/family`)
+- [x] **SupportNeed findByStudent FAMILIAR filter** — verifica enrollment antes de devolver datos
+- [x] **CourseService update/remove** — ownership check antes de findOne (evita query innecesaria si falla)
 
-### Pendiente (no bloqueante)
+### Auditoría de ownership — segunda ronda (completada 2026-07-25)
 
-- [ ] **CourseService** — sin checks de ownership. Cualquier DOCENTE puede crear/editar/borrar cursos en aulas ajenas.
-- [ ] **CompetencyService** — sin checks de ownership. Cualquier DOCENTE puede evaluar competencias de cualquier curso/estudiante.
-- [ ] **SupportNeedService** — sin verificación en create/update/delete. Cualquiera puede modificar necesidades de cualquier estudiante.
-- [ ] **acceptTeacherInvitation** — no verifica que el email del JWT coincida con el de la invitación.
-- [ ] **Grade/Attendance reads** — FAMILIAR puede ver notas/asistencia de cualquier estudiante/aula (sin filtrar ownership).
-- [ ] **getEnrollments/removeEnrollment** — sin ownership check.
-- [ ] **createClassroom** — permite `institutionId` arbitrario sin verificar que el DOCENTE pertenezca a esa IE.
-- [ ] **studentId DTOs** — usan `@IsString()` en vez de `@IsUUID()` en Grade/Competency/SupportNeed.
+- [x] **CourseService** — create/update/remove verifican ownership via classroom→teacherId.
+- [x] **CompetencyService** — evaluate verifica ownership via course→classroom→teacherId.
+- [x] **SupportNeedService** — create/update/remove verifican ownership: FAMILIAR→student.familiarId, DOCENTE→enrollment in one of their classrooms.
+- [x] **acceptTeacherInvitation** — verifica que `invitation.email` coincida con el JWT email.
+- [x] **Grade/Attendance reads** — FAMILIAR solo ve notas/asistencia de sus hijos (via Enrollment.familiarId).
+- [x] **getEnrollments/removeEnrollment** — verifican classroom→teacherId para DOCENTE.
+- [x] **createClassroom** — valida `institutionId` contra InstitutionTeacher si el DOCENTE proporciona uno.
+- [x] **studentId DTOs** — `@IsString()` → `@IsUUID()` en Grade/Competency/SupportNeed.
 
 ---
 

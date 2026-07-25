@@ -12,24 +12,24 @@ export class SupportNeedController {
   @Post()
   @Roles(Role.DOCENTE, Role.ADMIN, Role.FAMILIAR)
   create(@Body() dto: CreateSupportNeedDto, @CurrentUser() currentUser: JwtPayload) {
-    return this.supportNeedService.create(dto, currentUser.sub);
+    return this.supportNeedService.create(dto, currentUser.sub, currentUser.role);
   }
 
   @Get('student/:studentId')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
-  findByStudent(@Param('studentId') studentId: string) {
-    return this.supportNeedService.findByStudent(studentId);
+  findByStudent(@Param('studentId') studentId: string, @CurrentUser() user: JwtPayload) {
+    return this.supportNeedService.findByStudent(studentId, user.sub, user.role);
   }
 
   @Patch(':id')
-  @Roles(Role.DOCENTE, Role.ADMIN)
-  update(@Param('id') id: string, @Body() dto: UpdateSupportNeedDto) {
-    return this.supportNeedService.update(id, dto);
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.FAMILIAR)
+  update(@Param('id') id: string, @Body() dto: UpdateSupportNeedDto, @CurrentUser() user: JwtPayload) {
+    return this.supportNeedService.update(id, dto, user.sub, user.role);
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
-  remove(@Param('id') id: string) {
-    return this.supportNeedService.remove(id);
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.FAMILIAR)
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.supportNeedService.remove(id, user.sub, user.role);
   }
 }

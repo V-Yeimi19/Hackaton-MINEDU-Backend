@@ -1,5 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { EVENTS, RedisPubSubService } from '@minedu/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { EVENTS, RedisPubSubService, Role } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -13,7 +13,13 @@ export class CourseService {
     private pubsub: RedisPubSubService,
   ) {}
 
-  async create(dto: CreateCourseDto) {
+  async create(dto: CreateCourseDto, userId: string, userRole: string) {
+    if (userRole === Role.DOCENTE) {
+      const classroom = await this.prisma.classroom.findUnique({ where: { id: dto.classroomId } });
+      if (!classroom || classroom.teacherId !== userId) {
+        throw new ForbiddenException('No tienes permiso para crear cursos en este aula');
+      }
+    }
     const course = await this.prisma.course.create({
       data: { name: dto.name, classroomId: dto.classroomId },
       include: { classroom: true },
@@ -41,12 +47,28 @@ export class CourseService {
     return course;
   }
 
-  async update(id: string, dto: UpdateCourseDto) {
+  async update(id: string, dto: UpdateCourseDto, userId: string, userRole: string) {
+    if (userRole === Role.DOCENTE) {
+      const course = await this.prisma.course.findUnique({ where: { id } });
+      if (!course) throw new NotFoundException('Curso no encontrado');
+      const classroom = await this.prisma.classroom.findUnique({ where: { id: course.classroomId } });
+      if (!classroom || classroom.teacherId !== userId) {
+        throw new ForbiddenException('No tienes permiso para editar este curso');
+      }
+    }
     await this.findOne(id);
     return this.prisma.course.update({ where: { id }, data: dto });
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, userId: string, userRole: string): Promise<void> {
+    if (userRole === Role.DOCENTE) {
+      const course = await this.prisma.course.findUnique({ where: { id } });
+      if (!course) throw new NotFoundException('Curso no encontrado');
+      const classroom = await this.prisma.classroom.findUnique({ where: { id: course.classroomId } });
+      if (!classroom || classroom.teacherId !== userId) {
+        throw new ForbiddenException('No tienes permiso para eliminar este curso');
+      }
+    }
     await this.findOne(id);
     await this.prisma.course.delete({ where: { id } });
   }

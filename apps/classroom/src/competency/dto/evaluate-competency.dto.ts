@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsUUID } from 'class-validator';
 
 export enum CompetencyLevel {
   BASICO = 'BASICO',
@@ -11,8 +11,7 @@ export class EvaluateCompetencyDto {
   @IsUUID()
   competencyId: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   studentId: string;
 
   @IsUUID()

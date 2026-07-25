@@ -448,9 +448,9 @@ Este es el servicio más grande. Contiene 10 sub-recursos.
 | Método | Ruta | Acceso | Body | Response |
 |--------|------|--------|------|----------|
 | `POST` | `/support-needs` | DOCENTE, ADMIN, FAMILIAR | `{ studentId, type, level?, description? }` | `StudentSupportNeed` |
-| `GET` | `/support-needs/student/:studentId` | Todos los roles | — | `StudentSupportNeed[]` |
-| `PATCH` | `/support-needs/:id` | DOCENTE, ADMIN | `{ type?, level?, description? }` | `StudentSupportNeed` |
-| `DELETE` | `/support-needs/:id` | ADMIN | — | `{ deleted: true }` |
+| `GET` | `/support-needs/student/:studentId` | Todos los roles | — | `StudentSupportNeed[]` (FAMILIAR: solo hijos propios) |
+| `PATCH` | `/support-needs/:id` | DOCENTE, ADMIN, FAMILIAR | `{ type?, level?, description? }` | `StudentSupportNeed` |
+| `DELETE` | `/support-needs/:id` | DOCENTE, ADMIN, FAMILIAR | — | `{ deleted: true }` |
 
 ```typescript
 // CreateSupportNeedDto
@@ -513,34 +513,39 @@ Este es el servicio más grande. Contiene 10 sub-recursos.
 
 | Método | Ruta | Acceso | Body | Response |
 |--------|------|--------|------|----------|
-| `POST` | `/invitations` | DOCENTE, DIRECTIVO | `{ email, type, classroomId?, institutionId? }` | `Invitation` |
-| `POST` | `/invitations/accept/teacher` | Público (sin JWT, pero requiere JWT) | `{ token }` | `InstitutionTeacher` + aulas importadas |
-| `POST` | `/invitations/accept/family` | FAMILIAR | `{ token, studentId }` | `Enrollment` |
+| `POST` | `/invitations/teacher` | DIRECTIVO | `{ email, institutionId }` | `Invitation` |
+| `POST` | `/invitations/family` | DOCENTE | `{ email, classroomId }` | `Invitation` |
+| `POST` | `/invitations/accept/teacher` | DOCENTE (JWT) | `{ token }` | `InstitutionTeacher` + aulas importadas |
+| `POST` | `/invitations/accept/family` | FAMILIAR (JWT) | `{ token, studentId }` | `Enrollment` |
 | `GET` | `/invitations/token/:token` | Público (sin JWT) | — | `Invitation` |
-| `GET` | `/invitations` | JWT | — | `Invitation[]` (propias) |
+| `GET` | `/invitations` | JWT | — | `Invitation[]` (creadas por el usuario) |
 | `PATCH` | `/invitations/:id/revoke` | Cualquier autenticado | — | `Invitation` (REVOKED) |
 
 **Flujo de invitación docente**:
 1. El docente se registra normalmente (`POST /auth/register` con rol `DOCENTE`) — tiene su cuenta propia.
-2. El DIRECTIVO crea la invitación (`POST /invitations` con `type: "TEACHER_TO_INSTITUTION"`).
+2. El DIRECTIVO crea la invitación (`POST /invitations/teacher`).
 3. Se envía email con link a `/invitations/{token}`.
 4. El docente abre el link → `GET /invitations/token/:token` muestra los detalles (público, sin JWT).
 5. El docente acepta con su JWT: `POST /invitations/accept/teacher` con `{ token }`. Se crea `InstitutionTeacher` y se importan sus aulas independientes a la IE.
 
 **Flujo de invitación familiar**:
 1. El FAMILIAR se registra y registra a sus hijos (`POST /students`).
-2. El DOCENTE crea la invitación (`POST /invitations` con `type: "FAMILY_TO_CLASSROOM"`).
+2. El DOCENTE crea la invitación (`POST /invitations/family`).
 3. Se envía email con link.
 4. El FAMILIAR abre el link → `GET /invitations/token/:token` (público).
 5. El FAMILIAR acepta con su JWT: `POST /invitations/accept/family` con `{ token, studentId }`. Se crea `Enrollment` para ese hijo.
 
 ```typescript
-// CreateInvitationDto
+// CreateTeacherInvitationDto (POST /invitations/teacher)
 {
   email: string;               // email del invitado
-  type: "TEACHER_TO_INSTITUTION" | "FAMILY_TO_CLASSROOM";
-  institutionId?: string;      // requerido si type = TEACHER_TO_INSTITUTION
-  classroomId?: string;        // requerido si type = FAMILY_TO_CLASSROOM
+  institutionId: string;       // institución a la que se invita
+}
+
+// CreateFamilyInvitationDto (POST /invitations/family)
+{
+  email: string;               // email del invitado
+  classroomId: string;         // aula a la que se invita
 }
 
 // Invitation
@@ -977,8 +982,8 @@ Redis Pub/Sub. Los eventos se publican desde Classroom y Analytics reacciona.
    → Institution
 
 3. El DIRECTIVO invita al docente:
-   POST /api/classroom/invitations
-   Body: { email: "docente@minedu.edu.pe", type: "TEACHER_TO_INSTITUTION", institutionId: "..." }
+   POST /api/classroom/invitations/teacher
+   Body: { email: "docente@minedu.edu.pe", institutionId: "..." }
    → Invitation { token: "abc123..." }
 
 4. → Se envía email automáticamente con link: /invitations/abc123...

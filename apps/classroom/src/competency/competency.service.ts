@@ -1,5 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { EVENTS, RedisPubSubService } from '@minedu/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { EVENTS, RedisPubSubService, Role } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCompetencyDto } from './dto/create-competency.dto';
 import { EvaluateCompetencyDto } from './dto/evaluate-competency.dto';
@@ -31,8 +31,16 @@ export class CompetencyService {
     return competency;
   }
 
-  async evaluate(dto: EvaluateCompetencyDto) {
+  async evaluate(dto: EvaluateCompetencyDto, userId: string, userRole: string) {
     await this.findOne(dto.competencyId);
+    if (userRole === Role.DOCENTE) {
+      const course = await this.prisma.course.findUnique({ where: { id: dto.courseId } });
+      if (!course) throw new NotFoundException('Curso no encontrado');
+      const classroom = await this.prisma.classroom.findUnique({ where: { id: course.classroomId } });
+      if (!classroom || classroom.teacherId !== userId) {
+        throw new ForbiddenException('No tienes permiso para evaluar competencias en este curso');
+      }
+    }
     const evaluation = await this.prisma.studentCompetency.create({
       data: {
         competencyId: dto.competencyId,
@@ -59,7 +67,15 @@ export class CompetencyService {
     return evaluation;
   }
 
-  async findByStudent(studentId: string) {
+  async findByStudent(studentId: string, userId?: string, userRole?: string) {
+    if (userRole === Role.FAMILIAR && userId) {
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: { studentId, familiarId: userId },
+      });
+      if (!enrollment) {
+        throw new ForbiddenException('No tienes acceso a este estudiante');
+      }
+    }
     return this.prisma.studentCompetency.findMany({
       where: { studentId },
       include: { competency: true, course: true },

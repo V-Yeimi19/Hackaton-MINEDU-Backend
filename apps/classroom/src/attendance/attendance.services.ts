@@ -115,14 +115,32 @@ export class AttendanceService {
     return updated;
   }
 
-  async findByClassroom(classroomId: string) {
+  async findByClassroom(classroomId: string, userId?: string, userRole?: string) {
+    const where: any = { classroomId };
+    if (userRole === Role.FAMILIAR && userId) {
+      const enrollments = await this.prisma.enrollment.findMany({
+        where: { classroomId, familiarId: userId },
+        select: { studentId: true },
+      });
+      const studentIds = enrollments.map((e) => e.studentId);
+      if (studentIds.length === 0) return [];
+      where.studentId = { in: studentIds };
+    }
     return this.prisma.attendance.findMany({
-      where: { classroomId },
+      where,
       orderBy: { date: 'desc' },
     });
   }
 
-  async findByStudent(studentId: string) {
+  async findByStudent(studentId: string, userId?: string, userRole?: string) {
+    if (userRole === Role.FAMILIAR && userId) {
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: { studentId, familiarId: userId },
+      });
+      if (!enrollment) {
+        throw new ForbiddenException('No tienes acceso a la asistencia de este estudiante');
+      }
+    }
     return this.prisma.attendance.findMany({
       where: { studentId },
       orderBy: { date: 'desc' },

@@ -33,7 +33,8 @@ async function bootstrap() {
   );
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  const jwtCheck = createJwtCheckMiddleware(configService.get<string>('JWT_SECRET') as string);
+  const publicPaths = ['/invitations/token/'];
+  const jwtCheck = createJwtCheckMiddleware(configService.get<string>('JWT_SECRET') as string, publicPaths);
 
   const notificationsTarget = configService.get<string>('NOTIFICATIONS_SERVICE_URL');
   let notificationsWsProxy: ReturnType<typeof createProxyMiddleware> | undefined;

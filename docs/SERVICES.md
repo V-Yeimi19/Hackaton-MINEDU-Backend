@@ -95,7 +95,9 @@ El dominio operacional principal. **Remodelado 2026-07-25**: Institution (IE, so
 
 ### Course (`/courses`)
 
-- `POST /`, `GET /`, `GET /:id`, `PATCH /:id`, `DELETE /:id`.
+- `POST /` — DOCENTE/ADMIN. Ownership check: `classroomId` pertenece a un aula del docente.
+- `GET /`, `GET /:id` — catálogo, sin filtrado por ownership.
+- `PATCH /:id`, `DELETE /:id` — DOCENTE/ADMIN. Ownership check: course→classroom→teacherId (check antes de 404).
 - Relación invertida: `classroomId` en el body de creación (Course pertenece a Classroom).
 - Publica: `course.created`.
 
@@ -159,7 +161,10 @@ El dominio operacional principal. **Remodelado 2026-07-25**: Institution (IE, so
 ### Support Need (`/support-needs`)
 
 - CRUD para necesidades de apoyo de un estudiante (opcional, vinculado a `Student`).
-- `POST /`, `GET /student/:studentId`, `GET /:id`, `PATCH /:id`, `DELETE /:id`.
+- `POST /` — FAMILIAR (solo hijos propios) o DOCENTE (solo estudiantes en sus aulas).
+- `GET /student/:studentId` — FAMILIAR verifica ownership via Enrollment; otros roles sin restricción.
+- `GET /:id`, `PATCH /:id` — ownership check (FAMILIAR: student.familiarId, DOCENTE: enrollment).
+- `DELETE /:id` — ownership check.
 
 ### Internal (`/internal`)
 
