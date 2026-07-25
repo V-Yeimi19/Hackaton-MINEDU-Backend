@@ -109,10 +109,13 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/users_db
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      REDIS_URL: redis://redis:6379
     ports:
       - '3002:3002'
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   storage:
@@ -131,12 +134,15 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minedu}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minedu123}
       MINIO_BUCKET: ${MINIO_BUCKET:-minedu-files}
+      REDIS_URL: redis://redis:6379
     ports:
       - '3003:3003'
     depends_on:
       postgres:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   notifications:
@@ -150,8 +156,6 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       REDIS_URL: redis://redis:6379
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
-    ports:
-      - '3004:3004'
     depends_on:
       postgres:
         condition: service_healthy
@@ -171,10 +175,13 @@ services:
       CLASSROOM_SERVICE_INTERNAL_URL: http://classroom:3006
       ANALYTICS_SERVICE_INTERNAL_URL: http://analytics:3007
       STORAGE_SERVICE_INTERNAL_URL: http://storage:3003
+      REDIS_URL: redis://redis:6379
     ports:
       - '3005:3005'
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   classroom:
@@ -249,6 +256,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
       GROQ_API_KEY: ${GROQ_API_KEY}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
+      ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID:-JBFqnCBsd6RMkjVDRZzb}
       STORAGE_SERVICE_INTERNAL_URL: http://storage:3003
       REDIS_URL: redis://redis:6379
     ports:

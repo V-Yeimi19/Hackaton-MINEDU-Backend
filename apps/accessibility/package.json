@@ -12,6 +12,7 @@
     "prisma:generate": "prisma generate"
   },
   "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.59.0",
     "@minedu/common": "workspace:*",
     "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^11.0.1",

@@ -127,6 +127,8 @@ Cada servicio valida su entorno con Joi en `src/config/env.validation.ts` (`Conf
 | `INTERNAL_API_KEY` | todas las llamadas `/internal/*` | `dev-internal-key` |
 | `RATE_LIMIT_MAX` | gateway | `100` |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` / `MINIO_BUCKET` | storage, minio | `minedu` / `minedu123` / `minedu-files` |
-| `GROQ_API_KEY` | accessibility, para adaptación de texto (requerido, sin default) | — debe proveerse, si no el servicio no arranca (Joi `required()`). El texto-a-voz usa `espeak-ng` local, no necesita key. |
+| `GROQ_API_KEY` | accessibility, para adaptación de texto (requerido, sin default) | — debe proveerse, si no el servicio no arranca (Joi `required()`). |
+| `ELEVENLABS_API_KEY` | accessibility, para texto-a-voz (requerido, sin default) | — debe proveerse, si no el servicio no arranca (Joi `required()`). |
+| `ELEVENLABS_VOICE_ID` | accessibility, voz usada por ElevenLabs | `JBFqnCBsd6RMkjVDRZzb` |
 
 Cada servicio también recibe sus propias `*_SERVICE_INTERNAL_URL` (apuntando al hostname Docker del servicio del que depende) — ver el detalle por servicio en [SERVICES.md](./SERVICES.md).

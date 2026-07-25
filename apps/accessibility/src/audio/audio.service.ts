@@ -1,34 +1,36 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { spawn } from 'child_process';
+import { ConfigService } from '@nestjs/config';
+import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 
 @Injectable()
 export class AudioService {
   private readonly logger = new Logger(AudioService.name);
+  private readonly client: ElevenLabsClient;
 
-  textToSpeech(text: string): Promise<Buffer> {
-    const input = text.slice(0, 4096);
-    this.logger.log(`Generando audio TTS con espeak-ng (${input.length} caracteres)`);
-
-    return new Promise((resolve, reject) => {
-      const child = spawn('espeak-ng', ['-v', 'es', '-s', '150', '--stdout']);
-      const chunks: Buffer[] = [];
-      let stderr = '';
-
-      child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
-      child.stderr.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString();
-      });
-      child.on('error', reject);
-      child.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(`espeak-ng salió con código ${code}: ${stderr}`));
-          return;
-        }
-        resolve(Buffer.concat(chunks));
-      });
-
-      child.stdin.write(input, 'utf-8');
-      child.stdin.end();
+  constructor(private config: ConfigService) {
+    this.client = new ElevenLabsClient({
+      apiKey: this.config.get<string>('ELEVENLABS_API_KEY'),
     });
+  }
+
+  async textToSpeech(text: string): Promise<Buffer> {
+    const input = text.slice(0, 4096);
+    this.logger.log(`Generando audio TTS con ElevenLabs (${input.length} caracteres)`);
+
+    const voiceId = this.config.get<string>('ELEVENLABS_VOICE_ID') ?? 'JBFqnCBsd6RMkjVDRZzb';
+    const audioStream = await this.client.textToSpeech.convert(voiceId, {
+      text: input,
+      modelId: 'eleven_multilingual_v2',
+      voiceSettings: {
+        stability: 0.5,
+        similarityBoost: 0.75,
+      },
+    });
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of audioStream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
   }
 }
