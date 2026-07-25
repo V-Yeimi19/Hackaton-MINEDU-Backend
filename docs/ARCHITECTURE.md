@@ -25,14 +25,14 @@ flowchart TB
     AI -.->|"GET /internal/*"| CLASSROOM
     AI -.->|"GET /internal/*"| ANALYTICS
     AI -.->|"upload/download"| STORAGE
-    ACCESS -.->|"download"| STORAGE
+    ACCESS -.->|"download + upload"| STORAGE
 
     AUTH -->|"user.created, user.role_changed"| REDIS[(Redis pub/sub)]
     CLASSROOM -->|"11 eventos: course/classroom/attendance/grade/competency"| REDIS
     ANALYTICS -->|"risk.detected"| REDIS
     ACCESS -->|"accessibility.pipeline.completed"| REDIS
     REDIS -.-> NOTIF
-    REDIS -.-> ANALYTICS
+    REDIS -.->|"attendance/grade/competency events"| ANALYTICS
     REDIS -.->|"user.role_changed"| USERS
 
     AUTH --> PG[(Postgres: 9 DBs, 1 por servicio)]
@@ -99,7 +99,7 @@ Express, dentro del middleware de proxy del Gateway, **quita el prefijo del serv
 
 ## Eventos (Redis Pub/Sub) vs. llamadas HTTP internas — cuándo se usa cada uno
 
-- **Eventos** (`RedisPubSubService` + catálogo `EVENTS` en `@minedu/common`) se usan para **reacciones asíncronas desacopladas**: Classroom no sabe ni le importa que Analytics recalcula indicadores cuando se registra una asistencia; solo publica `attendance.registered`. Ver el mapa completo de eventos en [SERVICES.md](./SERVICES.md#catálogo-de-eventos).
+- **Eventos** (`RedisPubSubService` + catálogo `EVENTS` en `@minedu/common`) se usan para **reacciones asíncronas desacopladas**: Classroom no sabe ni le importa que Analytics recalcula indicadores cuando se registra una asistencia o competencia; solo publica `attendance.registered` o `competency.evaluated`. Ver el mapa completo de eventos en [SERVICES.md](./SERVICES.md#catálogo-de-eventos).
 - **Llamadas HTTP internas** (`/internal/*` + `InternalKeyGuard`) se usan cuando un servicio **necesita el dato ya, de forma síncrona**, para construir una respuesta (ej. Reports necesita leer clasrooms+attendances+grades+risk *en el momento* de generar un reporte — no puede esperar a que le lleguen por evento).
 
 ## Despliegue Docker

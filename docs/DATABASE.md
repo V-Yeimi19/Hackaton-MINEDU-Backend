@@ -120,6 +120,7 @@ erDiagram
     StudentCompetency {
         string id PK
         string studentId
+        string classroomId "agregado 2026-07-25, necesario para que Analytics recalcule por aula"
         string competencyId FK
         string level
         datetime date
@@ -148,6 +149,8 @@ erDiagram
         int gradeCount
         float gradeSum
         float participationScore
+        float competencyScore "promedio de niveles de competencia (0-1), agregado 2026-07-25"
+        int competencyCount "cantidad de evaluaciones de competencia, agregado 2026-07-25"
         datetime updatedAt
     }
     RiskAssessment {
@@ -170,7 +173,7 @@ erDiagram
     }
 ```
 
-`StudentIndicator` tiene `@@unique([studentId, classroomId])` — es un **acumulador que se actualiza in-place** cada vez que llega un evento de asistencia/nota (no una serie histórica; `gradeSum`/`gradeCount` existen justamente para poder recalcular el promedio incrementalmente sin releer todas las notas). `RiskLevel` = `NONE | LOW | MEDIUM | HIGH`. `RecommendationStatus` = `PENDING | SENT | DISMISSED`.
+`StudentIndicator` tiene `@@unique([studentId, classroomId])` — es un **acumulador que se actualiza in-place** cada vez que llega un evento de asistencia, nota o competencia (no una serie histórica; `gradeSum`/`gradeCount` existen justamente para poder recalcular el promedio incrementalmente sin releer todas las notas). `competencyScore` es el promedio de los niveles de competencia evaluados (mapeados: `BASICO=0.25`, `INTERMEDIO=0.5`, `AVANZADO=0.75`, `LOGRADO=1.0`). `RiskLevel` = `NONE | LOW | MEDIUM | HIGH`. `RecommendationStatus` = `PENDING | SENT | DISMISSED`.
 
 Ninguno de los tres modelos tiene relación Prisma declarada hacia Classroom (no puede — es otra base de datos); `studentId`/`classroomId` son strings sueltos que solo tienen sentido cruzados con `classroom_db` a nivel de aplicación.
 
@@ -209,9 +212,9 @@ erDiagram
         string originalText "nullable, texto extraido por OCR"
         string adaptedText "nullable, lectura facil generada por Groq (llama-3.3-70b-versatile)"
         string summaryText "nullable"
-        string audioFileId "nullable, no se usa todavia"
-        string subtitlesFileId "nullable, no se usa todavia"
-        json pictogramData "nullable, no se usa todavia"
+        string audioFileId "nullable, id del WAV en storage_db, generado por ElevenLabs"
+        string subtitlesFileId "nullable, id del SRT en storage_db, generado con timestamps proporcionales"
+        json pictogramData "nullable, array de {keyword, arasaacId, imageUrl} de la API ARASAAC"
         AdaptationLevel adaptationLevel
         string error "nullable"
         datetime createdAt
@@ -219,7 +222,7 @@ erDiagram
     }
 ```
 
-`JobStatus` = `PENDING | PROCESSING | COMPLETED | FAILED`. `AdaptationLevel` = `LEVE | MODERADO | SIGNIFICATIVO`. Nota: `audioFileId`, `subtitlesFileId` y `pictogramData` están en el schema pero **el pipeline actual no los llena** (el audio se devuelve directo en la response de `POST /process/audio`, no se persiste en Storage todavía) — quedaron como campos preparados para una extensión futura.
+`JobStatus` = `PENDING | PROCESSING | COMPLETED | FAILED`. `AdaptationLevel` = `LEVE | MODERADO | SIGNIFICATIVO`. Los tres campos de salida (`audioFileId`, `subtitlesFileId`, `pictogramData`) se poblan al completar el pipeline: el audio se sube a Storage vía `POST /internal/upload` (base64 JSON), el SRT se genera con `srt.util.ts` (timestamps proporcionales basados en la duración del WAV calculada desde el header), y los pictogramas se obtienen de la API pública de ARASAAC (hasta 10 keywords más frecuentes del texto adaptado, excluyendo stop words en español).
 
 ## `reports_db` — Reports
 

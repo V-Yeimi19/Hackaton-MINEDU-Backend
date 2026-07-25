@@ -84,7 +84,7 @@ No expone escritura pública — se recalcula reactivamente a partir de eventos 
 - `DigitalTwinController` (`/digital-twin`) — vista agregada por aula o por estudiante (`GET /digital-twin/classroom/:id`, `GET /digital-twin/classroom/:id/student/:id`).
 - `RecommendationController` (`/recommendations`) — lectura + `PATCH /recommendations/:id/dismiss`.
 - `InternalController` (`/internal`, `InternalKeyGuard`) — `GET /internal/indicators/classroom/:id`, `GET /internal/risk/classroom/:id`, `GET /internal/recommendations/classroom/:id`. **Consumido por AI y Reports.**
-- **Se suscribe** a `attendance.registered`/`attendance.updated` (`attendance-events.listener.ts`) y `grade.registered`/`grade.updated` (`grade-events.listener.ts`) → recalcula `StudentIndicator` → reevalúa `RiskAssessment` (`risk.service.ts`, reglas en `risk.rules.ts`) → si corresponde, genera `Recommendation` (`recommendation.rules.ts`).
+- **Se suscribe** a `attendance.registered`/`attendance.updated` (`attendance-events.listener.ts`), `grade.registered`/`grade.updated` (`grade-events.listener.ts`) y `competency.evaluated` (`competency-events.listener.ts`) → recalcula `StudentIndicator` (incluyendo `competencyScore`/`competencyCount`) → reevalúa `RiskAssessment` (`risk.service.ts`, reglas en `risk.rules.ts`, que ahora incluyen umbral de competencia) → si corresponde, genera `Recommendation` (`recommendation.rules.ts`).
 - Publica `risk.detected` cuando `risk.service.ts` sube el nivel de riesgo de un estudiante.
 - Depende de Classroom solo indirectamente (vía eventos, no HTTP).
 
@@ -100,11 +100,11 @@ Reporte PDF semanal **de una sola aula**, generado bajo demanda o por cron.
 
 ## Accessibility — puerto 3009, DB `accessibility_db`
 
-Pipeline de accesibilidad para material educativo: OCR → adaptación de texto → texto-a-voz.
+Pipeline de accesibilidad para material educativo: OCR → adaptación de texto → subtítulos → pictogramas → texto-a-voz.
 
 - `AccessibilityController` (`@Controller()` vacío) — `POST /process` (body `{ fileId, fileName, fileType, adaptationLevel }`), `POST /process/audio` (mismo pipeline, devuelve el audio directo), `GET /jobs`, `GET /jobs/:id`.
-- Pipeline (`pipeline.service.ts`): descarga el archivo de Storage (interno) → `OcrService` (`tesseract.js`, solo si el mimetype lo requiere) → `AdaptationService` (Groq, `llama-3.3-70b-versatile` vía el SDK de `openai` apuntando a `https://api.groq.com/openai/v1`: lectura fácil + resumen) → `AudioService` (ElevenLabs, SDK `@elevenlabs/elevenlabs-js`, modelo `eleven_multilingual_v2`, voz configurable vía `ELEVENLABS_VOICE_ID` — genera mp3) → persiste `AccessibilityJob` → publica `accessibility.pipeline.completed`.
-- Depende de: **Storage** (interno, descarga), **Groq** (API externa, requiere `GROQ_API_KEY` real — sin ella el servicio no arranca, Joi la exige), **ElevenLabs** (API externa, requiere `ELEVENLABS_API_KEY` real — sin ella el servicio no arranca, Joi la exige).
+- Pipeline (`pipeline.service.ts`): descarga el archivo de Storage (interno) → `OcrService` (`tesseract.js`, solo si el mimetype lo requiere) → `AdaptationService` (Groq, `llama-3.3-70b-versatile` vía el SDK de `openai` apuntando a `https://api.groq.com/openai/v1`: lectura fácil + resumen) → `AudioService` (ElevenLabs, SDK `@elevenlabs/elevenlabs-js`, modelo `eleven_multilingual_v2`, voz configurable vía `ELEVENLABS_VOICE_ID` — genera mp3) → **sube audio a Storage** (`POST /internal/upload`, base64 JSON) → **genera SRT** (`srt.util.ts`, timestamps proporcionales basados en duración del WAV) y lo sube a Storage → **consulta ARASAAC** (`pictogram.service.ts`, API pública `GET /api/pictograms/es/search/{keyword}`, hasta 10 keywords más frecuentes del texto adaptado, excluyendo stop words en español) → persiste `AccessibilityJob` con `audioFileId`, `subtitlesFileId` y `pictogramData` poblados → publica `accessibility.pipeline.completed`.
+- Depende de: **Storage** (interno, descarga + upload), **Groq** (API externa, requiere `GROQ_API_KEY` real — sin ella el servicio no arranca, Joi la exige), **ElevenLabs** (API externa, requiere `ELEVENLABS_API_KEY` real — sin ella el servicio no arranca, Joi la exige), **ARASAAC** (API pública, no requiere key, fallback silencioso si falla).
 - Publica `accessibility.pipeline.completed`. Nadie se suscribe a este evento todavía.
 
 ## Reports — puerto 3005, DB `reports_db`
@@ -130,7 +130,7 @@ Coexisten a propósito, con alcance distinto — si tocas la lógica de agregaci
 
 ## Catálogo de eventos
 
-Definidos en `packages/common/src/events/event-names.ts` (`EVENTS`). Los 15 están todos publicados por al menos un servicio; `user.created`, `user.role_changed` y los de asistencia/nota tienen un suscriptor activo hoy — `competency.evaluated` se publica pero nadie lo consume todavía (posible extensión futura).
+Definidos en `packages/common/src/events/event-names.ts` (`EVENTS`). Los 15 están todos publicados por al menos un servicio; todos tienen al menos un subscriber activo excepto `attendance.batch.registered`, `risk.detected` y `accessibility.pipeline.completed`.
 
 | Evento | Publica | Se suscribe |
 |---|---|---|
@@ -146,7 +146,7 @@ Definidos en `packages/common/src/events/event-names.ts` (`EVENTS`). Los 15 est�
 | `attendance.batch.registered` | Classroom | — |
 | `grade.registered` | Classroom | Analytics (recalcula indicador + riesgo) |
 | `grade.updated` | Classroom | Analytics (recalcula indicador + riesgo) |
-| `competency.evaluated` | Classroom | — |
+| `competency.evaluated` | Classroom | Analytics (recalcula competencyScore + riesgo) |
 | `risk.detected` | Analytics | — |
 | `accessibility.pipeline.completed` | Accessibility | — |
 
