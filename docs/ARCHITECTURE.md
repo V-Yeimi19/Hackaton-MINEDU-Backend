@@ -27,12 +27,13 @@ flowchart TB
     AI -.->|"upload/download"| STORAGE
     ACCESS -.->|"download"| STORAGE
 
-    AUTH -->|"user.created"| REDIS[(Redis pub/sub)]
+    AUTH -->|"user.created, user.role_changed"| REDIS[(Redis pub/sub)]
     CLASSROOM -->|"11 eventos: course/classroom/attendance/grade/competency"| REDIS
     ANALYTICS -->|"risk.detected"| REDIS
     ACCESS -->|"accessibility.pipeline.completed"| REDIS
     REDIS -.-> NOTIF
     REDIS -.-> ANALYTICS
+    REDIS -.->|"user.role_changed"| USERS
 
     AUTH --> PG[(Postgres: 9 DBs, 1 por servicio)]
     USERS --> PG
@@ -89,9 +90,10 @@ Express, dentro del middleware de proxy del Gateway, **quita el prefijo del serv
 
 ## Autenticación y autorización
 
-- **JWT** firmado por Auth (`JWT_SECRET` compartido por env entre todos los servicios). Payload: `{ sub, email, role }` (`JwtPayload` en `@minedu/common`).
+- **JWT** firmado por Auth (`JWT_SECRET` compartido por env entre todos los servicios). Payload: `{ sub, email, role, iat }` (`JwtPayload` en `@minedu/common`).
 - **Roles** (`Role` enum en `@minedu/common`): `ADMIN`, `DIRECTIVO`, `DOCENTE`, `ESPECIALISTA`, `ESTUDIANTE`. Cada endpoint declara `@Roles(...)` + `RolesGuard`.
 - **Auth no guarda el perfil completo del usuario** — solo `AuthUser` (email, passwordHash, role). Al registrar, llama internamente a Users (`POST /internal`) para crear el perfil (`fullName`, etc.) y publica `user.created` para que Notifications reaccione. Es decir, **el `id` de `AuthUser` (== `sub` del JWT) es el mismo `authUserId` que usa Users como clave foránea lógica** — no hay un solo "User" compartido, hay dos tablas en dos DBs distintas enlazadas por ese id.
+- **Cambiar el rol de un usuario** es exclusivo de Auth (`PATCH /api/auth/:authUserId/role`, `ADMIN`) — es la única fuente que se firma en el JWT. Publica `user.role_changed` (Users sincroniza su copia) y escribe `auth:role-version:<authUserId>` en Redis para invalidar JWTs viejos: `JwtStrategy.validate()` compara el `iat` del token contra esa marca en **todo** servicio con `JwtAuthGuard`, no solo en el Gateway — mismo criterio de defensa en profundidad que el resto de la validación de JWT. Fail-open si Redis no responde (se loguea, no se bloquea la request). Detalle completo en [SERVICES.md](./SERVICES.md#invalidación-de-sesión-por-cambio-de-rol).
 - **Llamadas internas** (`x-internal-key` == `INTERNAL_API_KEY`) no llevan JWT de usuario — son confianza de red interna, no de identidad.
 
 ## Eventos (Redis Pub/Sub) vs. llamadas HTTP internas — cuándo se usa cada uno

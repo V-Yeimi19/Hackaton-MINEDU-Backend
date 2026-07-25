@@ -1,12 +1,12 @@
 # Pendientes
 
-Última actualización: 2026-07-25. Snapshot de lo que quedó sin resolver tras implementar Reports, desplegar el stack completo en un VPS, y reemplazar OpenAI por Groq + `espeak-ng` en Accessibility. Ver [ARCHITECTURE.md](./ARCHITECTURE.md), [SERVICES.md](./SERVICES.md) y [DATABASE.md](./DATABASE.md) para el estado completo del sistema — esta lista es solo lo que falta.
+Última actualización: 2026-07-25. Snapshot de lo que quedó sin resolver tras implementar Reports, desplegar el stack completo en un VPS, reemplazar OpenAI por Groq + `espeak-ng` en Accessibility, y resolver la sincronización de rol Auth↔Users. Ver [ARCHITECTURE.md](./ARCHITECTURE.md), [SERVICES.md](./SERVICES.md) y [DATABASE.md](./DATABASE.md) para el estado completo del sistema — esta lista es solo lo que falta.
 
 ## Funcionalidad incompleta dentro de servicios ya implementados
 
 - [ ] **Accessibility no persiste `audioFileId`/`subtitlesFileId`/`pictogramData`.** Los tres campos existen en `AccessibilityJob` (`apps/accessibility/prisma/schema.prisma`) pero el pipeline actual (`pipeline.service.ts`) nunca los llena: el audio se devuelve directo en la response de `POST /process/audio`, no se sube a Storage; no hay generación de subtítulos ni pictogramas.
-- [ ] **Evento `competency.evaluated` sin consumidor.** Classroom lo publica (`competency.service.ts`) pero ningún servicio se suscribe — es el único de los 14 eventos del catálogo sin listener. Candidato natural: que Analytics lo incorpore al cálculo de riesgo/indicador.
-- [ ] **Rol duplicado entre Auth y Users sin sincronización.** `AuthUser.role` (auth_db) y `User.role` (users_db) son independientes; si se cambia el rol de un usuario en un lado, el otro no se entera. No hay endpoint ni evento para propagar el cambio.
+- [ ] **Evento `competency.evaluated` sin consumidor.** Classroom lo publica (`competency.service.ts`) pero ningún servicio se suscribe — es el único de los 15 eventos del catálogo sin listener. Candidato natural: que Analytics lo incorpore al cálculo de riesgo/indicador.
+- [x] ~~Rol duplicado entre Auth y Users sin sincronización.~~ Resuelto 2026-07-25: `PATCH /api/auth/:authUserId/role` (ADMIN) en Auth cambia `AuthUser.role`, publica `user.role_changed`, Users se suscribe y sincroniza su copia. Además invalida JWTs viejos (ver `JwtStrategy` en `docs/SERVICES.md#invalidación-de-sesión-por-cambio-de-rol`).
 
 ## Infraestructura / plataforma
 
@@ -27,3 +27,4 @@ Contexto para no repetir discusiones ya resueltas esta sesión:
 - **Reports vs AI**: coexisten a propósito, alcance distinto (multi-aula agregado vs. una sola aula). Ver `docs/SERVICES.md#ai-vs-reports`.
 - **Accessibility usa Groq (no OpenAI)** para adaptación de texto — sin key de OpenAI disponible. `espeak-ng` para audio.
 - **`MINIO_ENDPOINT` es configurable por env**, default `minio` (interno). En el despliegue actual apunta a la IP pública del VPS para que las descargas funcionen desde fuera.
+- **Cambio de rol vive en Auth, no en Users** — Auth es la fuente que se firma en el JWT, evita tener dos fuentes de verdad. La invalidación de sesión corre en `JwtStrategy` compartido (todo servicio con `JwtAuthGuard`), no solo en el Gateway, y es fail-open si Redis no responde.

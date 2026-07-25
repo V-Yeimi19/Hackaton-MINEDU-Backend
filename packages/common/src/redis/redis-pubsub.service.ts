@@ -36,6 +36,18 @@ export class RedisPubSubService implements OnModuleDestroy {
     });
   }
 
+  async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    if (ttlSeconds) {
+      await this.publisher.set(key, value, 'EX', ttlSeconds);
+    } else {
+      await this.publisher.set(key, value);
+    }
+  }
+
+  async get(key: string): Promise<string | null> {
+    return this.publisher.get(key);
+  }
+
   async onModuleDestroy(): Promise<void> {
     await this.publisher.quit();
     await this.subscriber.quit();

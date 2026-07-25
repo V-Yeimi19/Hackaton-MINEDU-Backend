@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Role } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
@@ -37,5 +38,9 @@ export class UsersService {
   async remove(id: string): Promise<void> {
     await this.findOne(id);
     await this.prisma.user.delete({ where: { id } });
+  }
+
+  async updateRoleByAuthUserId(authUserId: string, role: Role): Promise<void> {
+    await this.prisma.user.update({ where: { authUserId }, data: { role } });
   }
 }

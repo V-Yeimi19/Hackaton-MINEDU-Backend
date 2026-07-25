@@ -11,4 +11,5 @@ export const envValidationSchema = Joi.object({
   MINIO_ACCESS_KEY: Joi.string().required(),
   MINIO_SECRET_KEY: Joi.string().required(),
   MINIO_BUCKET: Joi.string().default('minedu-files'),
+  REDIS_URL: Joi.string().default('redis://localhost:6379'),
 });

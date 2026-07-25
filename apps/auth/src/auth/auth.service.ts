@@ -1,4 +1,5 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { EVENTS, JwtPayload, RedisPubSubService, Role } from '@minedu/common';
 import * as bcrypt from 'bcryptjs';
@@ -16,6 +17,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly usersClient: UsersClientService,
     private readonly redisPubSub: RedisPubSubService,
+    private readonly configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -65,6 +67,30 @@ export class AuthService {
 
   login(authUser: AuthUser) {
     return this.buildAuthResponse(authUser);
+  }
+
+  async changeRole(authUserId: string, role: Role) {
+    const existing = await this.prisma.authUser.findUnique({ where: { id: authUserId } });
+    if (!existing) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const authUser = await this.prisma.authUser.update({
+      where: { id: authUserId },
+      data: { role },
+    });
+
+    try {
+      await this.redisPubSub.publish(EVENTS.USER_ROLE_CHANGED, { authUserId, role });
+      const ttlSeconds = this.configService.get<number>('JWT_EXPIRES_IN') ?? 86400;
+      await this.redisPubSub.set(`auth:role-version:${authUserId}`, Date.now().toString(), ttlSeconds);
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo publicar ${EVENTS.USER_ROLE_CHANGED}: ${(error as Error).message}`,
+      );
+    }
+
+    return { id: authUser.id, email: authUser.email, role: authUser.role };
   }
 
   private buildAuthResponse(authUser: AuthUser) {

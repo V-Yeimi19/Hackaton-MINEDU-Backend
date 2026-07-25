@@ -19,8 +19,9 @@ Emite y valida credenciales. **No guarda el perfil del usuario** (eso es respons
 
 - `POST /register` — crea `AuthUser`, llama a Users internamente (`UsersClientService` → `POST /internal` en Users) para crear el perfil, publica `user.created`, devuelve `{ accessToken, user }`.
 - `POST /login` — `LocalAuthGuard` (Passport local strategy) + devuelve `{ accessToken, user }`.
-- Depende de: **Users** (interno, síncrono, bloqueante — si Users no responde, el registro falla), **Redis** (pub/sub, no bloqueante — el registro no falla si Redis cae).
-- Publica: `user.created`.
+- `PATCH /:authUserId/role` (`ADMIN`) — único endpoint del sistema que cambia el rol de un usuario. Actualiza `AuthUser.role` (la fuente que se firma en el JWT), publica `user.role_changed` para que Users sincronice su copia, y escribe `auth:role-version:<authUserId>` en Redis (TTL = `JWT_EXPIRES_IN`) para invalidar cualquier JWT emitido antes del cambio — ver [invalidación de sesión](#invalidación-de-sesión-por-cambio-de-rol).
+- Depende de: **Users** (interno, síncrono, bloqueante — si Users no responde, el registro falla), **Redis** (pub/sub + versión de rol, no bloqueante — un fallo de Redis no bloquea el registro ni el cambio de rol, solo hace fail-open la invalidación de sesión).
+- Publica: `user.created`, `user.role_changed`.
 - Hashing con `bcryptjs` (no `bcrypt` nativo — falla al compilar en pnpm+Windows).
 
 ## Users — puerto 3002, DB `users_db`
@@ -30,9 +31,10 @@ Perfil del usuario, separado de las credenciales.
 - `POST /internal` (`InternalKeyGuard`) — crea el perfil (llamado por Auth al registrar).
 - `GET /` (ADMIN, DIRECTIVO) — lista paginada.
 - `GET /:id` (self o ADMIN/DIRECTIVO) — `assertSelfOrPrivileged` compara `currentUser.sub` contra `user.authUserId`.
-- `PATCH /:id` (self o ADMIN/DIRECTIVO).
+- `PATCH /:id` (self o ADMIN/DIRECTIVO) — solo `fullName`, no cambia `role` (eso vive en Auth, ver arriba).
 - `DELETE /:id` (ADMIN, DIRECTIVO).
-- No depende de ningún otro servicio ni publica eventos.
+- **Se suscribe** a `user.role_changed` (`events-subscriber.service.ts`, nuevo) → `UsersService.updateRoleByAuthUserId` actualiza su copia de `role` para mantenerla igual a `auth_db`.
+- No llama a ningún otro servicio por HTTP.
 
 ## Storage — puerto 3003, DB `storage_db`, + MinIO
 
@@ -127,11 +129,12 @@ Coexisten a propósito, con alcance distinto — si tocas la lógica de agregaci
 
 ## Catálogo de eventos
 
-Definidos en `packages/common/src/events/event-names.ts` (`EVENTS`). Los 14 están todos publicados por al menos un servicio; solo `user.created` y los de asistencia/nota tienen un suscriptor activo hoy — `competency.evaluated` se publica pero nadie lo consume todavía (posible extensión futura).
+Definidos en `packages/common/src/events/event-names.ts` (`EVENTS`). Los 15 están todos publicados por al menos un servicio; `user.created`, `user.role_changed` y los de asistencia/nota tienen un suscriptor activo hoy — `competency.evaluated` se publica pero nadie lo consume todavía (posible extensión futura).
 
 | Evento | Publica | Se suscribe |
 |---|---|---|
 | `user.created` | Auth | Notifications (notificación de bienvenida) |
+| `user.role_changed` | Auth | Users (sincroniza su copia de `role`) |
 | `course.created` | Classroom | — |
 | `classroom.created` | Classroom | — |
 | `classroom.updated` | Classroom | — |
@@ -146,6 +149,12 @@ Definidos en `packages/common/src/events/event-names.ts` (`EVENTS`). Los 14 est�
 | `risk.detected` | Analytics | — |
 | `accessibility.pipeline.completed` | Accessibility | — |
 
+## Invalidación de sesión por cambio de rol
+
+`JwtStrategy.validate()` (`packages/common/src/strategies/jwt.strategy.ts`) compara el `iat` (issued-at) del JWT contra `auth:role-version:<authUserId>` en Redis (escrito por Auth en `changeRole()`, ver arriba). Si el token fue firmado antes del último cambio de rol, se rechaza con 401 — el usuario debe volver a loguear para obtener un JWT con el rol nuevo. Corre en **todo** servicio con `JwtAuthGuard` (no solo en el Gateway), consistente con el resto del sistema donde cada servicio valida el JWT de forma independiente. **Fail-open**: si Redis no responde, se loguea un warning y el JWT se acepta igual — Redis nunca es una dependencia dura para autenticarse. La clave tiene TTL = `JWT_EXPIRES_IN`, así que no crece indefinidamente (pasado ese tiempo todos los tokens pre-cambio ya expiraron solos).
+
+Por esto, `users`, `storage` y `reports` (que antes no tenían Redis conectado) ahora importan `RedisPubSubModule` y requieren `REDIS_URL` — necesario para que su `JwtStrategy` pueda hacer el chequeo, aunque esos tres servicios no publiquen ni consuman ningún evento propio.
+
 ## Guards y utilidades compartidas (`@minedu/common`)
 
-`Role`, `JwtPayload`, `JwtAuthGuard` + `JwtStrategy` (Passport), `RolesGuard` + `@Roles()`, `@CurrentUser()`, `InternalKeyGuard`, `HttpExceptionFilter`, `PaginationDto`, `RedisPubSubService` + `RedisPubSubModule` (`@Global()`), `EVENTS`. Se compila a `dist/` y se consume como paquete normal de `node_modules` — **hay que correr `pnpm --filter @minedu/common build` después de tocar `packages/common/src`** antes de que el resto de servicios vea el cambio (dev o build/Docker).
+`Role`, `JwtPayload`, `JwtAuthGuard` + `JwtStrategy` (Passport, ahora inyecta `RedisPubSubService` para el chequeo de arriba), `RolesGuard` + `@Roles()`, `@CurrentUser()`, `InternalKeyGuard`, `HttpExceptionFilter`, `PaginationDto`, `RedisPubSubService` (incluye `publish`/`subscribe` y `set`/`get` genéricos) + `RedisPubSubModule` (`@Global()`), `EVENTS`. Se compila a `dist/` y se consume como paquete normal de `node_modules` — **hay que correr `pnpm --filter @minedu/common build` después de tocar `packages/common/src`** antes de que el resto de servicios vea el cambio (dev o build/Docker).

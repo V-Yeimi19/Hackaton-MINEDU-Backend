@@ -8,4 +8,5 @@ export const envValidationSchema = Joi.object({
   CLASSROOM_SERVICE_INTERNAL_URL: Joi.string().uri().required(),
   ANALYTICS_SERVICE_INTERNAL_URL: Joi.string().uri().required(),
   STORAGE_SERVICE_INTERNAL_URL: Joi.string().uri().required(),
+  REDIS_URL: Joi.string().default('redis://localhost:6379'),
 });

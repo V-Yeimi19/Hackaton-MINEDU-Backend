@@ -1,6 +1,7 @@
 export const EVENTS = {
   USER_CREATED: 'user.created',
-  
+  USER_ROLE_CHANGED: 'user.role_changed',
+
   // Classroom
   COURSE_CREATED: 'course.created',
   CLASSROOM_CREATED: 'classroom.created',

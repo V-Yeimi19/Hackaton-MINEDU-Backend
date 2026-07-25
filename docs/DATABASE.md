@@ -38,7 +38,7 @@ erDiagram
     }
 ```
 
-Perfil separado de las credenciales. `role` está duplicado aquí respecto a `auth_db` (por diseño, para no depender de una llamada síncrona a Auth en cada lectura) — si un rol cambia, hay que actualizarlo en ambos lados (no hay un mecanismo de sincronización automática hoy).
+Perfil separado de las credenciales. `role` está duplicado aquí respecto a `auth_db` (por diseño, para no depender de una llamada síncrona a Auth en cada lectura) — se mantiene sincronizado vía el evento `user.role_changed` que publica Auth al cambiar el rol (`PATCH /api/auth/:authUserId/role`), consumido por `apps/users/src/events/events-subscriber.service.ts`. Ver [SERVICES.md](./SERVICES.md#invalidación-de-sesión-por-cambio-de-rol) para el mecanismo completo, incluida la invalidación de JWTs viejos.
 
 ## `storage_db` — Storage
 
