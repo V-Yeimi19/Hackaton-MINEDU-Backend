@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EVENTS, RedisPubSubService } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassroomDto } from './dto/create-classroom.dto';
@@ -7,6 +7,8 @@ import { EnrollClassroomDto } from './dto/enroll-classroom.dto';
 
 @Injectable()
 export class ClassroomService {
+  private readonly logger = new Logger(ClassroomService.name);
+
   constructor(
     private prisma: PrismaService,
     private pubsub: RedisPubSubService,
@@ -15,8 +17,13 @@ export class ClassroomService {
   async create(dto: CreateClassroomDto, teacherId: string) {
     const classroom = await this.prisma.classroom.create({ data: dto });
     try {
-      await this.pubsub.publish(EVENTS.CLASSROOM_CREATED, classroom);
-    } catch {}
+      await this.pubsub.publish(EVENTS.CLASSROOM_CREATED, {
+        ...classroom,
+        teacherId,
+      });
+    } catch (err) {
+      this.logger.warn('Fallo publicando evento CLASSROOM_CREATED', err);
+    }
     return classroom;
   }
 
@@ -43,7 +50,9 @@ export class ClassroomService {
     });
     try {
       await this.pubsub.publish(EVENTS.CLASSROOM_UPDATED, classroom);
-    } catch {}
+    } catch (err) {
+      this.logger.warn('Fallo publicando evento CLASSROOM_UPDATED', err);
+    }
     return classroom;
   }
 
@@ -64,7 +73,9 @@ export class ClassroomService {
         classroomId: dto.classroomId,
         studentId,
       });
-    } catch {}
+    } catch (err) {
+      this.logger.warn('Fallo publicando evento STUDENT_ENROLLED', err);
+    }
     return updated;
   }
 
@@ -80,7 +91,9 @@ export class ClassroomService {
         classroomId: dto.classroomId,
         studentId,
       });
-    } catch {}
+    } catch (err) {
+      this.logger.warn('Fallo publicando evento STUDENT_UNENROLLED', err);
+    }
     return updated;
   }
 }

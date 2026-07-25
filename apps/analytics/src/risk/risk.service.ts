@@ -27,7 +27,11 @@ export class RiskService {
       data: { studentId, classroomId, level, reasons },
     });
 
-    await this.pubsub.publish(EVENTS.RISK_DETECTED, assessment);
+    try {
+      await this.pubsub.publish(EVENTS.RISK_DETECTED, assessment);
+    } catch (err) {
+      this.logger.warn(`Fallo publicando evento RISK_DETECTED para ${studentId}`, err);
+    }
 
     try {
       await this.recommendations.generateFromRisk({

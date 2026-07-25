@@ -26,6 +26,20 @@ export class FilesService {
     });
   }
 
+  async uploadBuffer(buffer: Buffer, originalName: string, mimeType: string) {
+    const key = `${randomUUID()}${extname(originalName)}`;
+    await this.minio.putObject(key, buffer, mimeType);
+    return this.prisma.fileObject.create({
+      data: {
+        key,
+        originalName,
+        mimeType,
+        size: buffer.length,
+        ownerId: 'internal',
+      },
+    });
+  }
+
   async findAllByOwner(ownerId: string, query: ListFilesQueryDto) {
     const where = { ownerId };
     const [items, total] = await Promise.all([

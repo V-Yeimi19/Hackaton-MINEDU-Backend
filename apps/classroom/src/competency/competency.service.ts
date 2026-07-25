@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EVENTS, RedisPubSubService } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCompetencyDto } from './dto/create-competency.dto';
@@ -6,6 +6,8 @@ import { EvaluateCompetencyDto } from './dto/evaluate-competency.dto';
 
 @Injectable()
 export class CompetencyService {
+  private readonly logger = new Logger(CompetencyService.name);
+
   constructor(
     private prisma: PrismaService,
     private pubsub: RedisPubSubService,
@@ -44,7 +46,9 @@ export class CompetencyService {
         ...evaluation,
         competencyName: competency.name,
       });
-    } catch {}
+    } catch (err) {
+      this.logger.warn('Fallo publicando evento COMPETENCY_EVALUATED', err);
+    }
     return evaluation;
   }
 

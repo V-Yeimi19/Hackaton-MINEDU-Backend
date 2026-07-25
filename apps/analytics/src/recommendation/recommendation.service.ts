@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationDto } from '@minedu/common';
 import { buildRecommendation } from './recommendation.rules';
@@ -63,6 +63,8 @@ export class RecommendationService {
   }
 
   async dismiss(id: string) {
+    const existing = await this.prisma.recommendation.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Recomendación no encontrada');
     return this.prisma.recommendation.update({
       where: { id },
       data: { status: 'DISMISSED' },

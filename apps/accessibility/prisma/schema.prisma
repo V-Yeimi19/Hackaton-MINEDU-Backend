@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AdaptationLevel {
+  LEVE
+  MODERADO
+  SIGNIFICATIVO
+}
+
+model AccessibilityJob {
+  id              String         @id @default(uuid())
+  fileId          String
+  fileName        String
+  fileType        String
+  status          JobStatus      @default(PENDING)
+  originalText    String?
+  adaptedText     String?
+  summaryText     String?
+  audioFileId     String?
+  subtitlesFileId String?
+  pictogramData   Json?
+  adaptationLevel AdaptationLevel @default(MODERADO)
+  error           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}

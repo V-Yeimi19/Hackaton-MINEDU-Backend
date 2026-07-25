@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Report {
+  id           String   @id @default(uuid())
+  classroomId  String
+  courseId     String
+  teacherId    String
+  courseName   String
+  className    String
+  weekStart    DateTime
+  weekEnd      DateTime
+  studentCount Int
+  pdfFileId    String?
+  status       String   @default("GENERATED")
+  createdAt    DateTime @default(now())
+
+  @@index([classroomId])
+  @@index([courseId])
+}

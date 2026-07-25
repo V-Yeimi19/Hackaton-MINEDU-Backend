@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EVENTS, RedisPubSubService } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
@@ -6,6 +6,8 @@ import { UpdateGradeDto } from './dto/update-grade.dto';
 
 @Injectable()
 export class GradeService {
+  private readonly logger = new Logger(GradeService.name);
+
   constructor(
     private prisma: PrismaService,
     private pubsub: RedisPubSubService,
@@ -22,7 +24,9 @@ export class GradeService {
     });
     try {
       await this.pubsub.publish(EVENTS.GRADE_REGISTERED, grade);
-    } catch {}
+    } catch (err) {
+      this.logger.warn('Fallo publicando evento GRADE_REGISTERED', err);
+    }
     return grade;
   }
 
@@ -48,11 +52,17 @@ export class GradeService {
     const updated = await this.prisma.grade.update({ where: { id }, data: dto });
     try {
       await this.pubsub.publish(EVENTS.GRADE_UPDATED, updated);
-    } catch {}
+    } catch (err) {
+      this.logger.warn('Fallo publicando evento GRADE_UPDATED', err);
+    }
     return updated;
   }
 
   async remove(id: string): Promise<void> {
+    const grade = await this.prisma.grade.findUnique({ where: { id } });
+    if (!grade) {
+      throw new NotFoundException('Calificacion no encontrada');
+    }
     await this.prisma.grade.delete({ where: { id } });
   }
 }

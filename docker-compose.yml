@@ -124,6 +124,7 @@ services:
       PORT: 3003
       DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/storage_db
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_USE_SSL: 'false'
@@ -173,9 +174,18 @@ services:
       dockerfile: apps/classroom/Dockerfile
     restart: unless-stopped
     environment:
-      PORT: 3006
+      CLASSROOM_PORT: 3006
+      DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/classroom_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      REDIS_URL: redis://redis:6379
     ports:
       - '3006:3006'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   analytics:
     build:
@@ -183,9 +193,19 @@ services:
       dockerfile: apps/analytics/Dockerfile
     restart: unless-stopped
     environment:
-      PORT: 3007
+      ANALYTICS_PORT: 3007
+      DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/analytics_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      CLASSROOM_SERVICE_INTERNAL_URL: http://classroom:3006
+      REDIS_URL: redis://redis:6379
     ports:
       - '3007:3007'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   ai:
     build:
@@ -193,9 +213,21 @@ services:
       dockerfile: apps/ai/Dockerfile
     restart: unless-stopped
     environment:
-      PORT: 3008
+      AI_PORT: 3008
+      DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/ai_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      CLASSROOM_SERVICE_INTERNAL_URL: http://classroom:3006
+      ANALYTICS_SERVICE_INTERNAL_URL: http://analytics:3007
+      STORAGE_SERVICE_INTERNAL_URL: http://storage:3003
+      REDIS_URL: redis://redis:6379
     ports:
       - '3008:3008'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   accessibility:
     build:
@@ -203,9 +235,20 @@ services:
       dockerfile: apps/accessibility/Dockerfile
     restart: unless-stopped
     environment:
-      PORT: 3009
+      ACCESSIBILITY_PORT: 3009
+      DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/accessibility_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      STORAGE_SERVICE_INTERNAL_URL: http://storage:3003
+      REDIS_URL: redis://redis:6379
     ports:
       - '3009:3009'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:

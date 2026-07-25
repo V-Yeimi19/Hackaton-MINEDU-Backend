@@ -10,6 +10,7 @@ import { ClassroomModule } from './classroom/classroom.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { GradeModule } from './grade/grade.module';
 import { CompetencyModule } from './competency/competency.module';
+import { InternalModule } from './internal/internal.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { CompetencyModule } from './competency/competency.module';
     AttendanceModule,
     GradeModule,
     CompetencyModule,
+    InternalModule,
   ],
   controllers: [HealthController],
 })

@@ -10,6 +10,7 @@ import { DigitalTwinModule } from './digital-twin/digital-twin.module';
 import { RiskModule } from './risk/risk.module';
 import { RecommendationModule } from './recommendation/recommendation.module';
 import { EventListenersModule } from './event-listeners/event-listeners.module';
+import { InternalModule } from './internal/internal.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { EventListenersModule } from './event-listeners/event-listeners.module';
     RiskModule,
     RecommendationModule,
     EventListenersModule,
+    InternalModule,
   ],
   controllers: [HealthController],
 })

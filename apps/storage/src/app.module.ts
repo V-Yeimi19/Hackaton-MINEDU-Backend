@@ -6,6 +6,7 @@ import { FilesModule } from './files/files.module';
 import { HealthController } from './health/health.controller';
 import { MinioModule } from './minio/minio.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { InternalModule } from './internal/internal.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
     MinioModule,
     AuthModule,
     FilesModule,
+    InternalModule,
   ],
   controllers: [HealthController],
 })

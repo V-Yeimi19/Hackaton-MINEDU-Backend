@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EVENTS, RedisPubSubService } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCourseDto } from './dto/create-course.dto';
@@ -6,6 +6,8 @@ import { UpdateCourseDto } from './dto/update-course.dto';
 
 @Injectable()
 export class CourseService {
+  private readonly logger = new Logger(CourseService.name);
+
   constructor(
     private prisma: PrismaService,
     private pubsub: RedisPubSubService,
@@ -15,7 +17,9 @@ export class CourseService {
     const course = await this.prisma.course.create({ data: dto });
     try {
       await this.pubsub.publish(EVENTS.COURSE_CREATED, course);
-    } catch {}
+    } catch (err) {
+      this.logger.warn('Fallo publicando evento COURSE_CREATED', err);
+    }
     return course;
   }
 

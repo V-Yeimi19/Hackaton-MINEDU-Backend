@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsString, IsUUID, IsNumber, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsString, IsUUID, IsNumber, Min, Max } from 'class-validator';
 
 export class CreateGradeDto {
   @IsString()
@@ -13,5 +13,7 @@ export class CreateGradeDto {
   evaluation: string;
 
   @IsNumber()
+  @Min(0)
+  @Max(20)
   score: number;
 }

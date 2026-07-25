@@ -4,6 +4,7 @@ export const envValidationSchema = Joi.object({
   PORT: Joi.number().default(3003),
   DATABASE_URL: Joi.string().required(),
   JWT_SECRET: Joi.string().required(),
+  INTERNAL_API_KEY: Joi.string().required(),
   MINIO_ENDPOINT: Joi.string().default('localhost'),
   MINIO_PORT: Joi.number().default(9000),
   MINIO_USE_SSL: Joi.boolean().default(false),

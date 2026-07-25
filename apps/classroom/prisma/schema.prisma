@@ -26,8 +26,8 @@ model Classroom {
   id          String   @id @default(uuid())
   name        String
   courseId    String
-  course      Course   @relation(fields: [courseId], references: [id])
-  studentIds  String[] // ids que viven en Users Service
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  studentIds  String[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   attendances Attendance[]
@@ -45,11 +45,13 @@ model Attendance {
   id          String            @id @default(uuid())
   studentId   String
   classroomId String
-  classroom   Classroom         @relation(fields: [classroomId], references: [id])
+  classroom   Classroom         @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   date        DateTime
   status      AttendanceStatus
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+
+  @@unique([studentId, classroomId, date])
 }
 
 model Grade {

@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard, RolesGuard, Roles } from '@minedu/common';
+import { JwtAuthGuard, RolesGuard, Roles, Role } from '@minedu/common';
 import { CourseService } from './course.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -10,6 +10,7 @@ export class CourseController {
   constructor(private readonly courseService: CourseService) {}
 
   @Post()
+  @Roles(Role.DOCENTE, Role.ADMIN)
   create(@Body() dto: CreateCourseDto) {
     return this.courseService.create(dto);
   }
@@ -25,11 +26,13 @@ export class CourseController {
   }
 
   @Patch(':id')
+  @Roles(Role.DOCENTE, Role.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdateCourseDto) {
     return this.courseService.update(id, dto);
   }
 
   @Delete(':id')
+  @Roles(Role.DOCENTE, Role.ADMIN)
   remove(@Param('id') id: string) {
     return this.courseService.remove(id);
   }

@@ -19,4 +19,4 @@ COPY --from=build /repo ./
 
 WORKDIR /repo/apps/classroom
 EXPOSE 3006
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy; node dist/main.js"]

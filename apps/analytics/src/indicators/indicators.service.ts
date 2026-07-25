@@ -1,4 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationDto } from '@minedu/common';
 
@@ -21,7 +24,19 @@ interface GradeEventPayload {
 export class IndicatorsService {
   private readonly logger = new Logger(IndicatorsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+    private http: HttpService,
+  ) {}
+
+  private get classroomUrl() {
+    return this.config.get<string>('CLASSROOM_SERVICE_INTERNAL_URL');
+  }
+
+  private get internalKey() {
+    return this.config.get<string>('INTERNAL_API_KEY');
+  }
 
   async recalculateAttendance(payload: AttendanceEventPayload) {
     const { studentId, classroomId, status, previousStatus } = payload;
@@ -48,8 +63,8 @@ export class IndicatorsService {
 
     return this.prisma.studentIndicator.upsert({
       where: { studentId_classroomId: { studentId, classroomId } },
-      update: { totalCount, presentCount, attendanceRate },
-      create: { studentId, classroomId, totalCount, presentCount, attendanceRate },
+      update: { totalCount, presentCount, attendanceRate, participationScore: attendanceRate },
+      create: { studentId, classroomId, totalCount, presentCount, attendanceRate, participationScore: attendanceRate },
     });
   }
 
@@ -80,14 +95,16 @@ export class IndicatorsService {
   }
 
   async recalculateAllGrades(studentId: string, classroomId: string) {
-    const grades = await this.prisma.$queryRawUnsafe<{ score: number }[]>(
-      `SELECT score FROM "Grade" WHERE "studentId" = $1 AND "classroomId" = $2`,
-      studentId,
-      classroomId,
+    const { data: grades } = await firstValueFrom(
+      this.http.get<{ score: number }[]>(
+        `${this.classroomUrl}/internal/classroom/${classroomId}/grades`,
+        { headers: { 'x-internal-key': this.internalKey } },
+      ),
     );
 
-    const gradeSum = grades.reduce((sum, g) => sum + g.score, 0);
-    const gradeCount = grades.length;
+    const studentGrades = grades.filter((g: any) => g.studentId === studentId);
+    const gradeSum = studentGrades.reduce((sum, g) => sum + g.score, 0);
+    const gradeCount = studentGrades.length;
     const avgGrade = gradeCount > 0 ? gradeSum / gradeCount : 0;
 
     return this.prisma.studentIndicator.upsert({
