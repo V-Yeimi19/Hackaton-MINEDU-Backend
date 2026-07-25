@@ -1,10 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { Role } from '@minedu/common';
 import { ClassroomTwinResponse, StudentTwinSnapshot } from './dto/digital-twin-response.dto';
 
 @Injectable()
 export class DigitalTwinService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(DigitalTwinService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+    private http: HttpService,
+  ) {}
 
   async getClassroomTwin(classroomId: string): Promise<ClassroomTwinResponse> {
     const indicators = await this.prisma.studentIndicator.findMany({
@@ -74,12 +84,35 @@ export class DigitalTwinService {
     };
   }
 
-  async getStudentTwin(studentId: string, classroomId: string): Promise<StudentTwinSnapshot> {
+  async getStudentTwin(studentId: string, classroomId: string, userId?: string, userRole?: Role): Promise<StudentTwinSnapshot> {
+    if (userRole === Role.FAMILIAR && userId) {
+      await this.ensureFamiliarAccess(studentId, userId);
+    }
     const twin = await this.getClassroomTwin(classroomId);
     const student = twin.students.find((s) => s.studentId === studentId);
     if (!student) {
       throw new NotFoundException(`Estudiante ${studentId} no encontrado en aula ${classroomId}`);
     }
     return student;
+  }
+
+  private get classroomUrl() {
+    return this.config.get<string>('CLASSROOM_SERVICE_INTERNAL_URL');
+  }
+
+  private get internalKey() {
+    return this.config.get<string>('INTERNAL_API_KEY');
+  }
+
+  private async ensureFamiliarAccess(studentId: string, userId: string) {
+    const { data: students } = await firstValueFrom(
+      this.http.get<{ id: string }[]>(
+        `${this.classroomUrl}/internal/students/familiar/${userId}`,
+        { headers: { 'x-internal-key': this.internalKey } },
+      ),
+    );
+    if (!students.some((s) => s.id === studentId)) {
+      throw new ForbiddenException('No tienes acceso a este estudiante');
+    }
   }
 }

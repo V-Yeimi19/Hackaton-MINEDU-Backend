@@ -23,8 +23,8 @@ export class ClassroomController {
 
   @Get(':id')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
-  findOne(@Param('id') id: string) {
-    return this.classroomService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.classroomService.findOne(id, user.sub, user.role);
   }
 
   @Patch(':id')

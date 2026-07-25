@@ -1,6 +1,6 @@
 # Pendientes
 
-Última actualización: 2026-07-25 (post-auditoría de ownership + invitation flow).
+Última actualización: 2026-07-25 (post-auditoría completa de ownership).
 
 ## ✅ Refactor IE/roles: adaptación de código completada
 
@@ -56,6 +56,11 @@ El 2026-07-25 se remodeló el dominio a nivel de BD y el código de aplicación 
 - [x] **API.md invitations paths** — documentación alineada con código real (`/invitations/teacher`, `/invitations/family`)
 - [x] **SupportNeed findByStudent FAMILIAR filter** — verifica enrollment antes de devolver datos
 - [x] **CourseService update/remove** — ownership check antes de findOne (evita query innecesaria si falla)
+- [x] **Classroom findOne** — ownership check: DOCENTE→teacherId, FAMILIAR→enrollment
+- [x] **Course findAll/findOne** — FAMILIAR solo ve cursos de aulas donde tiene hijos matriculados
+- [x] **Analytics student reads** — FAMILIAR verify via Classroom internal endpoint
+- [x] **Digital Twin getStudentTwin** — FAMILIAR verify via Classroom internal endpoint
+- [x] **Recommendations dismiss** — DOCENTE verify ownership via Classroom internal endpoint
 
 ### Auditoría de ownership — segunda ronda (completada 2026-07-25)
 

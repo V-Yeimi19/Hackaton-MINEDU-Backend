@@ -89,14 +89,15 @@ El dominio operacional principal. **Remodelado 2026-07-25**: Institution (IE, so
   - `DOCENTE`: solo aulas propias (`teacherId` match).
   - `FAMILIAR`: solo aulas donde tiene hijos matriculados (via `Enrollment.student.familiarId`).
 - `POST /` — `name` + `gradeLevel` + `institutionId?` (opcional, crear aula independiente).
-- `GET /:id`, `PATCH /:id`, `DELETE /:id` — ownership check: `classroom.teacherId === userId` (o `ADMIN`).
+- `GET /:id` — ownership check: DOCENTE→teacherId, FAMILIAR→enrollment, ADMIN/DIRECTIVO→sin restricción.
+- `PATCH /:id`, `DELETE /:id` — ownership check: `classroom.teacherId === userId` (o `ADMIN`).
 - `GET /:id/courses` — cursos del aula.
 - Publica: `classroom.created`, `classroom.updated`, `classroom.deleted`.
 
 ### Course (`/courses`)
 
 - `POST /` — DOCENTE/ADMIN. Ownership check: `classroomId` pertenece a un aula del docente.
-- `GET /`, `GET /:id` — catálogo, sin filtrado por ownership.
+- `GET /`, `GET /:id` — FAMILIAR solo ve cursos de aulas donde tiene hijos matriculados; otros roles ven todo.
 - `PATCH /:id`, `DELETE /:id` — DOCENTE/ADMIN. Ownership check: course→classroom→teacherId (check antes de 404).
 - Relación invertida: `classroomId` en el body de creación (Course pertenece a Classroom).
 - Publica: `course.created`.
@@ -184,9 +185,9 @@ Publica 19 eventos (catálogo abajo).
 
 No expone escritura pública — se recalcula reactivamente a partir de eventos de Classroom.
 
-- `IndicatorsController` (`/indicators`) — `GET /indicators/classroom/:id`, `GET /indicators/student/:id/classroom/:id`, `GET /indicators/student/:id`.
-- `DigitalTwinController` (`/digital-twin`) — vista agregada por aula o por estudiante (`GET /digital-twin/classroom/:id`, `GET /digital-twin/classroom/:id/student/:id`).
-- `RecommendationController` (`/recommendations`) — lectura + `PATCH /recommendations/:id/dismiss`.
+- `IndicatorsController` (`/indicators`) — `GET /indicators/classroom/:id`, `GET /indicators/student/:id/classroom/:id`, `GET /indicators/student/:id`. FAMILIAR: endpoints por estudiante verifican ownership via Classroom internal (`/internal/students/familiar/:familiarId`).
+- `DigitalTwinController` (`/digital-twin`) — vista agregada por aula (`GET /digital-twin/classroom/:id`) o por estudiante (`GET /digital-twin/classroom/:id/student/:id`). FAMILIAR: endpoint por estudiante verifica ownership via Classroom internal.
+- `RecommendationController` (`/recommendations`) — lectura + `PATCH /recommendations/:id/dismiss`. FAMILIAR: `GET /recommendations/student/:id` verifica ownership via Classroom internal. DOCENTE: `dismiss` verifica ownership via Classroom internal (`/internal/classroom/:id`).
 - `InternalController` (`/internal`, `InternalKeyGuard`) — `GET /internal/indicators/classroom/:id`, `GET /internal/risk/classroom/:id`, `GET /internal/recommendations/classroom/:id`. **Consumido por AI y Reports.**
 - **Se suscribe** a `attendance.registered`/`attendance.updated` (`attendance-events.listener.ts`), `grade.registered`/`grade.updated` (`grade-events.listener.ts`) y `competency.evaluated` (`competency-events.listener.ts`) → recalcula `StudentIndicator` (incluyendo `competencyScore`/`competencyCount`) → reevalúa `RiskAssessment` (`risk.service.ts`, reglas en `risk.rules.ts`, que ahora incluyen umbral de competencia) → si corresponde, genera `Recommendation` (`recommendation.rules.ts`).
 - Publica `risk.detected` cuando `risk.service.ts` sube el nivel de riesgo de un estudiante.

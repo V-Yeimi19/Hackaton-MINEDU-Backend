@@ -32,17 +32,37 @@ export class CourseService {
     return course;
   }
 
-  async findAll() {
+  async findAll(userId?: string, userRole?: string) {
+    if (userRole === Role.FAMILIAR && userId) {
+      const enrollments = await this.prisma.enrollment.findMany({
+        where: { familiarId: userId },
+        select: { classroomId: true },
+      });
+      if (enrollments.length === 0) return [];
+      const classroomIds = enrollments.map((e) => e.classroomId);
+      return this.prisma.course.findMany({
+        where: { classroomId: { in: classroomIds } },
+        include: { classroom: true },
+      });
+    }
     return this.prisma.course.findMany({ include: { classroom: true } });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, userId?: string, userRole?: string) {
     const course = await this.prisma.course.findUnique({
       where: { id },
       include: { classroom: true },
     });
     if (!course) {
       throw new NotFoundException('Curso no encontrado');
+    }
+    if (userRole === Role.FAMILIAR && userId) {
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: { classroomId: course.classroomId, familiarId: userId },
+      });
+      if (!enrollment) {
+        throw new ForbiddenException('No tienes acceso a este curso');
+      }
     }
     return course;
   }

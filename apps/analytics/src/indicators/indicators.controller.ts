@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard, RolesGuard, Roles, Role, PaginationDto } from '@minedu/common';
+import { JwtAuthGuard, RolesGuard, Roles, Role, PaginationDto, CurrentUser, JwtPayload } from '@minedu/common';
 import { IndicatorsService } from './indicators.service';
 
 @Controller('indicators')
@@ -18,13 +18,18 @@ export class IndicatorsController {
   findByStudentAndClassroom(
     @Param('studentId') studentId: string,
     @Param('classroomId') classroomId: string,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.indicatorsService.findByStudentAndClassroom(studentId, classroomId);
+    return this.indicatorsService.findByStudentAndClassroom(studentId, classroomId, user.sub, user.role);
   }
 
   @Get('student/:studentId')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
-  findByStudent(@Param('studentId') studentId: string, @Query() pagination: PaginationDto) {
-    return this.indicatorsService.findByStudent(studentId, pagination);
+  findByStudent(
+    @Param('studentId') studentId: string,
+    @Query() pagination: PaginationDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.indicatorsService.findByStudent(studentId, pagination, user.sub, user.role);
   }
 }
