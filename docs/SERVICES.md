@@ -23,6 +23,7 @@ Emite y valida credenciales. **No guarda el perfil del usuario** (eso es respons
 - `PATCH /:authUserId/role` (`ADMIN`) — único endpoint del sistema que cambia el rol de un usuario. Actualiza `AuthUser.role` (la fuente que se firma en el JWT), publica `user.role_changed` para que Users sincronice su copia, y escribe `auth:role-version:<authUserId>` en Redis (TTL = `JWT_EXPIRES_IN`) para invalidar cualquier JWT emitido antes del cambio — ver [invalidación de sesión](#invalidación-de-sesión-por-cambio-de-rol).
 - Depende de: **Users** (interno, síncrono, bloqueante — si Users no responde, el registro falla), **Redis** (pub/sub + versión de rol, no bloqueante — un fallo de Redis no bloquea el registro ni el cambio de rol, solo hace fail-open la invalidación de sesión).
 - Publica: `user.created`, `user.role_changed`.
+- **Roles (remodelado 2026-07-25)**: `ADMIN | DIRECTIVO | DOCENTE | FAMILIAR`. Ya no existen `ESPECIALISTA` ni `ESTUDIANTE` (el estudiante no es usuario — es un registro `Student` en Classroom, creado por su FAMILIAR). Registrar con un rol viejo devuelve 400 (`@IsEnum(Role)` en `RegisterDto`).
 - Hashing con `bcryptjs` (no `bcrypt` nativo — falla al compilar en pnpm+Windows).
 
 ## Users — puerto 3002, DB `users_db`
@@ -63,25 +64,26 @@ Guarda archivos binarios (subidos por usuarios o generados por otros servicios: 
 
 ## Classroom — puerto 3006, DB `classroom_db`
 
-El dominio operacional principal: cursos, aulas, asistencia, notas, competencias. Fuente de verdad para Analytics, AI y Reports.
+El dominio operacional principal. **Remodelado a nivel de BD el 2026-07-25** (ver [DATABASE.md](./DATABASE.md#classroom_db--classroom-11-modelos-el-esquema-más-grande)): ahora es **Institution (IE, del DIRECTIVO) → Classroom (aula, del DOCENTE) → Course (curso)**, con estudiantes como registros (`Student`, creados por su FAMILIAR, ya no usuarios), matrícula por `Enrollment` al aula vía invitaciones por link, asistencia por aula y notas/competencias por curso. Fuente de verdad para Analytics, AI, Reports y Accessibility.
 
-Controladores (todos requieren JWT + rol):
+**⚠️ Los controladores actuales corresponden al modelo viejo y están pendientes de adaptación** (no compilan contra el schema nuevo — ver la sección de refactor en [PENDING.md](./PENDING.md)). Estado actual del código:
 
-- `CourseController` (`/courses`) — CRUD, `DOCENTE`/`ADMIN` para escritura.
-- `ClassroomController` (`/classrooms`) — CRUD + `POST /classrooms/enroll` y `POST /classrooms/unenroll` (rol `ESTUDIANTE`, se auto-matricula con su propio `sub`).
-- `AttendanceController` (`/attendance`) — `POST /attendance` recibe un batch (`{ classroomId, date, records: [{studentId, status}] }`), `GET /attendance/classroom/:id`, `GET /attendance/student/:id`, `PATCH /attendance/:id`.
-- `GradeController` (`/grades`) — CRUD, `GET /grades/classroom/:id`, `GET /grades/student/:id`.
-- `CompetencyController` (`/competencies`) — CRUD + `POST /competencies/evaluate`.
-- `SupportNeedController` (`/support-needs`, agregado 2026-07-25 para el desafío de Educación Básica Especial de la Categoría A del hackathon) — `POST /support-needs` (`DOCENTE`/`ESPECIALISTA`/`ADMIN`, `registeredBy` se toma del JWT, no del body), `GET /support-needs/student/:studentId` (+ `DIRECTIVO`), `PATCH /support-needs/:id` (`DOCENTE`/`ESPECIALISTA`/`ADMIN`), `DELETE /support-needs/:id` (`ESPECIALISTA`/`ADMIN`). **Sin acceso para `ESTUDIANTE`** — es dato sensible (tipo de discapacidad/necesidad de apoyo).
-- `InternalController` (`/internal`, `InternalKeyGuard`) — `GET /internal/classroom/:id` (con curso), `GET /internal/classroom/:id/attendances`, `GET /internal/classroom/:id/grades`, `GET /internal/classrooms` (todas), `GET /internal/courses`, `GET /internal/support-needs/student/:studentId`. **Consumido por AI, Reports y Accessibility** (esta última solo la ruta de support-needs, para personalizar fichas didácticas).
+- `CourseController` (`/courses`) — obsoleto: asume `gradeLevel`/`teacherId` en Course (ahora viven en Classroom) y no exige `classroomId`.
+- `ClassroomController` (`/classrooms`) — obsoleto: `enroll`/`unenroll` con rol `ESTUDIANTE` (ya no existe) sobre el array `studentIds` (reemplazado por `Enrollment`+`Invitation`).
+- `AttendanceController` (`/attendance`) — mayormente vigente (la asistencia sigue por aula), pero `studentId` ahora es `Student.id`.
+- `GradeController` (`/grades`) — obsoleto en parte: las notas ahora referencian `courseId`, no `classroomId`.
+- `CompetencyController` (`/competencies`) — ídem (por curso ahora).
+- `SupportNeedController` (`/support-needs`) — vigente en espíritu, pero `studentId` ahora es `Student.id` (FK real) y los guards referencian `ESPECIALISTA` (rol eliminado); falta decidir el acceso del `FAMILIAR` a las necesidades de su propio hijo.
+- `InternalController` (`/internal`) — contratos a re-validar: `GET /internal/classroom/:id/grades` ahora implica agregar las notas de los cursos del aula.
+- **Endpoints nuevos por construir** (otro dev): CRUD de `Institution` (solo DIRECTIVO), invitaciones (crear/aceptar/revocar, tipos `TEACHER_TO_INSTITUTION` y `FAMILY_TO_CLASSROOM`), registro de `Student` por el FAMILIAR (con sus necesidades de apoyo), matrícula vía aceptación de invitación (1 hijo por link).
 
-No depende de ningún otro servicio para escribir (es la fuente). Publica 11 eventos (ver catálogo abajo) desde `course.service.ts`, `classroom.services.ts`, `attendance.services.ts`, `grade.service.ts`, `competency.service.ts`. `StudentSupportNeed` no publica evento — se lee de forma síncrona vía HTTP interno cuando se necesita (ver [DATABASE.md](./DATABASE.md#classroom_db--classroom-7-modelos-el-esquema-más-grande)).
+Publica 11 eventos (catálogo abajo) — los payloads de nota/competencia necesitarán incluir `classroomId` resuelto vía `Course` para que Analytics siga funcionando (pendiente).
 
 ## Analytics ("Gemelo Digital") — puerto 3007, DB `analytics_db`
 
 No expone escritura pública — se recalcula reactivamente a partir de eventos de Classroom.
 
-- `IndicatorsController` (`/indicators`) — `GET /indicators/classroom/:id`, `GET /indicators/student/:id/classroom/:id`, `GET /indicators/student/:id` (accesible también por el propio `ESTUDIANTE`).
+- `IndicatorsController` (`/indicators`) — `GET /indicators/classroom/:id`, `GET /indicators/student/:id/classroom/:id`, `GET /indicators/student/:id`. **Nota**: los guards de este servicio aún referencian `ESTUDIANTE`/`ESPECIALISTA` (roles eliminados el 2026-07-25) — el acceso "self del estudiante" desaparece o pasa al `FAMILIAR`; limpieza pendiente (ver PENDING).
 - `DigitalTwinController` (`/digital-twin`) — vista agregada por aula o por estudiante (`GET /digital-twin/classroom/:id`, `GET /digital-twin/classroom/:id/student/:id`).
 - `RecommendationController` (`/recommendations`) — lectura + `PATCH /recommendations/:id/dismiss`.
 - `InternalController` (`/internal`, `InternalKeyGuard`) — `GET /internal/indicators/classroom/:id`, `GET /internal/risk/classroom/:id`, `GET /internal/recommendations/classroom/:id`. **Consumido por AI y Reports.**
@@ -108,6 +110,7 @@ Pipeline de accesibilidad para material educativo: OCR → adaptación de texto 
 - **Fichas didácticas** (`processWorksheet`, agregado 2026-07-25 para el desafío de Educación Básica Especial de la Categoría A — ver `docs/hackathon-bases-2026.pdf`): reusa el pipeline base para obtener `adaptedText`+`pictogramData`, y si el request trae `studentId` consulta `GET /internal/support-needs/student/:studentId` en Classroom (`CLASSROOM_SERVICE_INTERNAL_URL`, fail-open — si Classroom no responde la ficha igual se genera, sin personalizar). Le pide a `AdaptationService.generateWorksheet()` (Groq, prompt distinto al de lectura fácil) reestructurar el texto en una ficha JSON (`{title, instructions, exercises[]}`, tipos `opcion_multiple`/`verdadero_falso`/`completar`) — si hay necesidades de apoyo registradas, el prompt agrega una guía por tipo (`SUPPORT_NEED_GUIDANCE` en `adaptation.service.ts`, ej. TEA → instrucciones literales sin lenguaje figurado). `worksheet-pdf.util.ts` maquetea el resultado con `pdfkit` (título, palabras clave con imágenes de pictogramas, ejercicios con espacio de respuesta) y lo sube a Storage. Persiste `worksheetFileId`/`worksheetContent` en el mismo `AccessibilityJob`.
 - Depende de: **Storage** (interno, descarga + upload), **Classroom** (interno, solo para `process/worksheet` con `studentId`, opcional/fail-open), **Groq** (API externa, requiere `GROQ_API_KEY` real — sin ella el servicio no arranca, Joi la exige), **ElevenLabs** (API externa, requiere `ELEVENLABS_API_KEY` real — sin ella el servicio no arranca, Joi la exige), **ARASAAC** (API pública, no requiere key, fallback silencioso si falla).
 - Publica `accessibility.pipeline.completed`. Nadie se suscribe a este evento todavía.
+- **Nota (remodelado 2026-07-25)**: los guards referencian `ESPECIALISTA` (rol eliminado) y `GenerateWorksheetDto.studentId` ahora significa `Student.id` de classroom_db (antes authUserId) — limpieza pendiente (ver PENDING).
 
 ## Reports — puerto 3005, DB `reports_db`
 

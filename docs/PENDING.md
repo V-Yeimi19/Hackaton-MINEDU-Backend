@@ -1,6 +1,46 @@
 # Pendientes
 
-Última actualización: 2026-07-25 (post-support-needs+fichas). Snapshot de lo que quedó sin resolver tras implementar Reports, desplegar el stack completo en un VPS, reemplazar OpenAI por Groq en Accessibility, resolver la sincronización de rol Auth↔Users + el WebSocket de Notifications detrás del Gateway, reemplazar `espeak-ng` por ElevenLabs para el texto-a-voz de Accessibility, consumir el evento `competency.evaluated` en Analytics, persistir audio/subtítulos/pictogramas en Accessibility, y agregar necesidades de apoyo por estudiante (Classroom) + generación de fichas didácticas personalizadas (Accessibility) para el desafío de Educación Básica Especial de la Categoría A del hackathon. Ver [ARCHITECTURE.md](./ARCHITECTURE.md), [SERVICES.md](./SERVICES.md) y [DATABASE.md](./DATABASE.md) para el estado completo del sistema — esta lista es solo lo que falta.
+Última actualización: 2026-07-25 (post-remodelado de BD: IE/roles/invitaciones).
+
+## ⚠️ Refactor IE/roles: trabajo de aplicación pendiente (PRIORITARIO)
+
+El 2026-07-25 se remodeló el dominio **solo a nivel de base de datos** (schemas Prisma + migraciones + enum `Role` en `@minedu/common`): jerarquía `Institution → Classroom (aula) → Course`, roles `ADMIN|DIRECTIVO|DOCENTE|FAMILIAR` (desaparecen `ESPECIALISTA`/`ESTUDIANTE`), estudiantes como registros `Student` (ya no usuarios), matrícula `Enrollment` al aula vía `Invitation` por link (1 hijo por invitación), asistencia por aula y notas/competencias por curso. Detalle del modelo en [DATABASE.md](./DATABASE.md#classroom_db--classroom-11-modelos-el-esquema-más-grande). **La adaptación del código de aplicación es de otro desarrollador** — esta es la lista concreta de lo afectado (verificada por grep contra el código actual):
+
+### Compilación rota (intencional, hasta adaptar)
+
+`@minedu/common` ya exporta el `Role` nuevo y los clientes Prisma de classroom se regenerarán contra el schema nuevo en el próximo build — estos archivos no compilan hasta adaptarse:
+
+- [ ] `apps/classroom/src/classroom/classroom.controller.ts:42,48` + `classroom.services.ts` — `@Roles(Role.ESTUDIANTE)` en `enroll`/`unenroll` y todo el manejo de `studentIds` (campo eliminado). El flujo entero se reemplaza por invitaciones (`Invitation` + `Enrollment`). Los DTOs de Classroom además necesitan `institutionId`/`gradeLevel`.
+- [ ] `apps/classroom/src/course/*` (controller, service, DTOs) — `Course` ya no tiene `gradeLevel` ni `teacherId` (viven en `Classroom`) y ahora exige `classroomId` (relación invertida).
+- [ ] `apps/classroom/src/grade/*` y `apps/classroom/src/competency/*` — `Grade`/`StudentCompetency` ahora referencian `courseId`, no `classroomId`; DTOs y queries cambian.
+- [ ] `apps/classroom/src/attendance/*` — vigente en estructura (sigue por aula), pero `studentId` ahora es `Student.id` con FK real: registrar asistencia de un estudiante no matriculado o inexistente fallará por FK — validar contra `Enrollment`.
+- [ ] `apps/classroom/src/support-need/support-need.controller.ts:13,19,25,31` — quitar `ESPECIALISTA` de los guards; `studentId` ahora es `Student.id`; decidir acceso del `FAMILIAR` (el modelo sugiere que registre las necesidades de su propio hijo al crearlo).
+- [ ] `apps/classroom/src/internal/internal.controller.ts` — adaptar contratos: `GET /internal/classroom/:id/grades` ahora debe agregar las notas de los cursos del aula; la "matrícula" se lee de `Enrollment`; agregar lo que necesite el flujo de invitaciones.
+- [ ] `apps/accessibility/src/accessibility.controller.ts:13,23,34,44,50` — quitar `ESPECIALISTA` de los guards. `GenerateWorksheetDto.studentId` pasa a ser `Student.id` (el endpoint interno de support-needs no cambia de forma, solo de semántica del id).
+- [ ] `apps/analytics/src/indicators/indicators.controller.ts:11,17,26`, `digital-twin.controller.ts:12,18`, `recommendation.controller.ts:11,17` — quitar `ESPECIALISTA`/`ESTUDIANTE`. El acceso "self" del estudiante desaparece (ya no loguea); definir si el `FAMILIAR` puede ver los indicadores de sus hijos (requiere resolver la relación `familiarId → Student` vía Classroom).
+
+### Lógica a adaptar (compila pero queda incorrecta)
+
+- [ ] `apps/analytics/src/digital-twin/digital-twin.service.ts` + `event-listeners/` — dependían de `studentIds` del aula (ahora `Enrollment` vía HTTP interno) y de eventos de nota/competencia con `classroomId` directo. Como `Grade`/`StudentCompetency` ahora son por curso, **Classroom debe incluir `classroomId` resuelto vía `Course` en los payloads de `grade.*` y `competency.evaluated`** (opción recomendada: resolverlo en el publicador, no en cada consumidor). `StudentIndicator`/`RiskAssessment` siguen keyed por `[studentId, classroomId]` — sin cambio de schema en analytics_db, pero `studentId` ahora significa `Student.id`.
+- [ ] `apps/ai/src/report/report.service.ts` y `apps/reports/src/report/report.service.ts` — usan `classroom.studentIds` (eliminado) y `/internal/classroom/:id/grades`; adaptar a `Enrollment` + notas agregadas por cursos del aula. El conteo de estudiantes y el cruce con indicadores/riesgo usa ahora `Student.id`.
+- [ ] `test/e2e.smoke.spec.ts` y `test/*.integration.spec.ts` — registran usuarios con `role: ESTUDIANTE`/`ESPECIALISTA` (ahora 400) y usan el flujo enroll viejo.
+- [ ] Datos residuales: analytics_db y accessibility_db conservan filas con `studentId` = authUserId viejos (huérfanos tras el reset de classroom_db) — limpiar o ignorar.
+
+### Endpoints nuevos por construir
+
+- [ ] CRUD de `Institution` — solo `DIRECTIVO` crea/administra sus IEs.
+- [ ] Invitaciones: `DIRECTIVO` genera link `TEACHER_TO_INSTITUTION`; `DOCENTE` (miembro de la IE vía `InstitutionTeacher`) genera link `FAMILY_TO_CLASSROOM`; endpoints de aceptar (valida token único/no expirado/no usado, crea `InstitutionTeacher` o `Enrollment` según tipo) y revocar.
+- [ ] Registro de `Student` por el `FAMILIAR` (con `StudentSupportNeed` opcionales en el mismo flujo) y edición/lectura de sus propios hijos.
+- [ ] Matrícula: al aceptar una invitación de aula, el `FAMILIAR` elige **1** de sus hijos → se crea el `Enrollment` (constraint `@@unique([classroomId, studentId])` ya lo protege de duplicados).
+
+### Despliegue
+
+- [ ] **NO redeployar** classroom/analytics/ai/reports/accessibility al VPS hasta completar la adaptación — el build de Docker fallará al regenerar el cliente Prisma (esperado). `auth` y `users` sí compilan y pueden desplegarse (sus migraciones mapean roles: `ESTUDIANTE→FAMILIAR`, `ESPECIALISTA→DOCENTE`), pero conviene desplegar todo junto al final para no dejar el stack híbrido.
+- Las migraciones se aplican solas al bootear cada contenedor (`prisma migrate deploy` en el CMD del Dockerfile). La de classroom (`20260725170002_institutions_and_families`) es **destructiva**: dropea y recrea todo el dominio (aprobado — data de prueba).
+
+---
+
+Lo que sigue es el snapshot histórico de pendientes previos al remodelado (Reports, despliegue VPS, Groq, rol Auth↔Users, WebSocket, ElevenLabs, `competency.evaluated`, persistencia de Accessibility, support-needs + fichas). Ver [ARCHITECTURE.md](./ARCHITECTURE.md), [SERVICES.md](./SERVICES.md) y [DATABASE.md](./DATABASE.md) para el estado completo del sistema — esta lista es solo lo que falta.
 
 ## Funcionalidad incompleta dentro de servicios ya implementados
 

@@ -1,11 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
-  output = "../generated/prisma"
+  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -13,26 +8,135 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Course {
-  id          String   @id @default(uuid())
-  name        String
-  gradeLevel  String
-  teacherId   String
-  createdAt   DateTime @default(now())
-  classrooms  Classroom[]
-}
+// ============================================================
+// Institución Educativa: creada y administrada por un DIRECTIVO
+// ============================================================
 
-model Classroom {
+model Institution {
   id          String   @id @default(uuid())
   name        String
-  courseId    String
-  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  studentIds  String[]
+  code        String?  @unique
+  address     String?
+  directorId  String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  attendances Attendance[]
-  grades      Grade[]
+  classrooms  Classroom[]
+  teachers    InstitutionTeacher[]
+  invitations Invitation[]
 }
+
+model InstitutionTeacher {
+  id            String      @id @default(uuid())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  teacherId     String
+  invitationId  String?
+  joinedAt      DateTime    @default(now())
+
+  @@unique([institutionId, teacherId])
+}
+
+// ============================================================
+// Aula (creada por un DOCENTE de la IE) → cursos dentro del aula
+// ============================================================
+
+model Classroom {
+  id            String      @id @default(uuid())
+  name          String
+  gradeLevel    String
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  teacherId     String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  courses       Course[]
+  enrollments   Enrollment[]
+  attendances   Attendance[]
+  invitations   Invitation[]
+}
+
+model Course {
+  id           String    @id @default(uuid())
+  name         String
+  classroomId  String
+  classroom    Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  grades       Grade[]
+  competencies StudentCompetency[]
+}
+
+// ============================================================
+// Estudiante: ya no es usuario — lo registra su FAMILIAR
+// ============================================================
+
+model Student {
+  id           String    @id @default(uuid())
+  fullName     String
+  birthDate    DateTime?
+  familiarId   String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  supportNeeds StudentSupportNeed[]
+  enrollments  Enrollment[]
+  attendances  Attendance[]
+  grades       Grade[]
+  competencies StudentCompetency[]
+
+  @@index([familiarId])
+}
+
+// ============================================================
+// Invitaciones por link (un solo uso)
+// ============================================================
+
+enum InvitationType {
+  TEACHER_TO_INSTITUTION
+  FAMILY_TO_CLASSROOM
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+model Invitation {
+  id            String           @id @default(uuid())
+  token         String           @unique @default(uuid())
+  type          InvitationType
+  status        InvitationStatus @default(PENDING)
+  institutionId String?
+  institution   Institution?     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  classroomId   String?
+  classroom     Classroom?       @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  createdBy     String
+  usedBy        String?
+  usedAt        DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime         @default(now())
+}
+
+// ============================================================
+// Matrícula: al AULA, 1 hijo por invitación aceptada
+// ============================================================
+
+model Enrollment {
+  id           String    @id @default(uuid())
+  classroomId  String
+  classroom    Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  familiarId   String
+  invitationId String?
+  createdAt    DateTime  @default(now())
+
+  @@unique([classroomId, studentId])
+}
+
+// ============================================================
+// Asistencia POR AULA, notas y competencias POR CURSO
+// ============================================================
 
 enum AttendanceStatus {
   PRESENT
@@ -42,46 +146,54 @@ enum AttendanceStatus {
 }
 
 model Attendance {
-  id          String            @id @default(uuid())
+  id          String           @id @default(uuid())
   studentId   String
+  student     Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
   classroomId String
-  classroom   Classroom         @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  classroom   Classroom        @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   date        DateTime
   status      AttendanceStatus
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   @@unique([studentId, classroomId, date])
 }
 
 model Grade {
-  id          String   @id @default(uuid())
-  studentId   String
-  classroomId String
-  classroom   Classroom @relation(fields: [classroomId], references: [id])
-  evaluation  String
-  score       Float
-  date        DateTime @default(now())
+  id         String   @id @default(uuid())
+  studentId  String
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId   String
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  evaluation String
+  score      Float
+  date       DateTime @default(now())
 }
 
 model Competency {
-  id          String   @id @default(uuid())
-  name        String
-  area        String
-  levels      StudentCompetency[]
+  id     String @id @default(uuid())
+  name   String
+  area   String
+  levels StudentCompetency[]
 }
 
 model StudentCompetency {
   id           String     @id @default(uuid())
   studentId    String
-  classroomId  String
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId     String
+  course       Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
   competencyId String
   competency   Competency @relation(fields: [competencyId], references: [id])
   level        String
   date         DateTime   @default(now())
 
-  @@index([studentId, classroomId])
+  @@index([studentId, courseId])
 }
+
+// ============================================================
+// Necesidades de apoyo: ahora cuelgan del Student (FK real)
+// ============================================================
 
 enum SupportNeedType {
   DISCAPACIDAD_VISUAL
@@ -104,6 +216,7 @@ enum SupportLevel {
 model StudentSupportNeed {
   id           String          @id @default(uuid())
   studentId    String
+  student      Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
   type         SupportNeedType
   level        SupportLevel    @default(MODERADO)
   description  String?

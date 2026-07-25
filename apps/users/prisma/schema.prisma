@@ -12,8 +12,7 @@ enum Role {
   ADMIN
   DIRECTIVO
   DOCENTE
-  ESPECIALISTA
-  ESTUDIANTE
+  FAMILIAR
 }
 
 model User {
