@@ -5,6 +5,7 @@
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** — topología del sistema, flujo de una request, modelo de autenticación, despliegue Docker, variables de entorno.
 - **[SERVICES.md](./SERVICES.md)** — ficha por servicio: responsabilidad, endpoints públicos e internos, de quién depende, qué eventos publica/consume.
 - **[DATABASE.md](./DATABASE.md)** — los 9 esquemas de Postgres (uno por servicio con base de datos propia), campo por campo.
+- **[PENDING.md](./PENDING.md)** — lista de features/deuda técnica pendiente, con checkboxes. Empezar por ahí antes de preguntar "¿qué falta?".
 
 ## Cómo se mantiene esto al día
 
