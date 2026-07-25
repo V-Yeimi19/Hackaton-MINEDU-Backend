@@ -4,6 +4,7 @@ export interface StudentTwinSnapshot {
   attendanceRate: number;
   avgGrade: number;
   participationScore: number;
+  competencyScore: number;
   riskLevel: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH';
   riskReasons: string[];
   recommendations: {

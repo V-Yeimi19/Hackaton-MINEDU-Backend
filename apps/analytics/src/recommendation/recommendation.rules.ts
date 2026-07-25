@@ -2,12 +2,15 @@
 export function buildRecommendation(reasons: string[]): { type: string; message: string } {
   const hasAttendance = reasons.includes('attendance_below_threshold');
   const hasGrade = reasons.includes('grade_below_threshold');
+  const hasCompetency = reasons.includes('competency_below_threshold');
   const hasNeuro = reasons.includes('suspicion_neurodivergence');
 
-  if (hasAttendance && hasGrade) {
+  const criticalCount = [hasAttendance, hasGrade, hasCompetency].filter(Boolean).length;
+
+  if (criticalCount >= 2) {
     return {
       type: 'urgent_intervention',
-      message: 'Estudiante con asistencia y calificación por debajo del umbral. Considerar contacto con familia y actividad de refuerzo.',
+      message: 'Estudiante con múltiples indicadores por debajo del umbral. Considerar contacto con familia y plan de apoyo integral.',
     };
   }
   if (hasAttendance) {
@@ -20,6 +23,12 @@ export function buildRecommendation(reasons: string[]): { type: string; message:
     return {
       type: 'differentiated_activity',
       message: 'Proponer actividad de refuerzo diferenciada según competencia más débil.',
+    };
+  }
+  if (hasCompetency) {
+    return {
+      type: 'differentiated_activity',
+      message: 'Estudiante con nivel de competencia por debajo de lo esperado. Aplicar estrategias de refuerzo por competencia.',
     };
   }
   if (hasNeuro) {

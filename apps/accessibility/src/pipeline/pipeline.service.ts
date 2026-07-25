@@ -3,11 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '../../generated/prisma';
 import { OcrService } from '../ocr/ocr.service';
 import { AdaptationService } from '../adaptation/adaptation.service';
 import { AudioService } from '../audio/audio.service';
 import { ProcessContentDto, AdaptationLevel } from './dto/pipeline.dto';
 import { EVENTS, RedisPubSubService } from '@minedu/common';
+import { PictogramService } from './pictogram.service';
+import { generateSrt, getAudioDurationFromWav } from './srt.util';
 
 @Injectable()
 export class PipelineService {
@@ -21,6 +24,7 @@ export class PipelineService {
     private pubsub: RedisPubSubService,
     private config: ConfigService,
     private http: HttpService,
+    private pictogram: PictogramService,
   ) {}
 
   private get storageUrl() {
@@ -54,6 +58,30 @@ export class PipelineService {
       buffer: Buffer.from(response.data),
       contentType: fileInfo.mimeType,
     };
+  }
+
+  private async uploadToStorage(
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string,
+  ): Promise<string | null> {
+    try {
+      const { data } = await firstValueFrom(
+        this.http.post(
+          `${this.storageUrl}/internal/upload`,
+          {
+            buffer: buffer.toString('base64'),
+            originalName,
+            mimeType,
+          },
+          { headers: { 'x-internal-key': this.internalKey } },
+        ),
+      );
+      return data.id as string;
+    } catch (err) {
+      this.logger.warn(`Fallo subiendo ${originalName} a Storage`, err);
+      return null;
+    }
   }
 
   async process(dto: ProcessContentDto) {
@@ -100,11 +128,39 @@ export class PipelineService {
       this.logger.log(`[${job.id}] Generando audio...`);
       const audioBuffer = await this.audio.textToSpeech(adaptedText);
 
+      this.logger.log(`[${job.id}] Subiendo audio a Storage...`);
+      const audioFileId = await this.uploadToStorage(
+        audioBuffer,
+        `audio-${job.id}.wav`,
+        'audio/wav',
+      );
+
+      this.logger.log(`[${job.id}] Generando subtítulos...`);
+      const duration = getAudioDurationFromWav(audioBuffer);
+      const srtContent = generateSrt(adaptedText, duration);
+      const subtitlesFileId = await this.uploadToStorage(
+        Buffer.from(srtContent, 'utf-8'),
+        `subtitles-${job.id}.srt`,
+        'application/x-subrip',
+      );
+
+      this.logger.log(`[${job.id}] Buscando pictogramas...`);
+      let pictogramData: Prisma.InputJsonValue | undefined;
+      try {
+        const pictograms = await this.pictogram.fetchPictograms(adaptedText);
+        pictogramData = pictograms as unknown as Prisma.InputJsonValue;
+      } catch (err) {
+        this.logger.warn(`[${job.id}] No se pudieron obtener pictogramas`, err);
+      }
+
       await this.prisma.accessibilityJob.update({
         where: { id: job.id },
         data: {
           adaptedText,
           summaryText,
+          audioFileId,
+          subtitlesFileId,
+          ...(pictogramData !== undefined ? { pictogramData } : {}),
           status: 'COMPLETED',
         },
       });

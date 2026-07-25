@@ -38,6 +38,7 @@ export class CompetencyService {
       data: {
         competencyId: dto.competencyId,
         studentId: dto.studentId,
+        classroomId: dto.classroomId,
         level: dto.level,
       },
     });

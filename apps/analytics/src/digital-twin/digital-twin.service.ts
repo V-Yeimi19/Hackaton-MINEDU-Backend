@@ -52,6 +52,7 @@ export class DigitalTwinService {
         attendanceRate: indicator.attendanceRate,
         avgGrade: indicator.avgGrade,
         participationScore: indicator.participationScore,
+        competencyScore: indicator.competencyScore,
         riskLevel: risk?.level ?? 'NONE',
         riskReasons: risk?.reasons ?? [],
         recommendations: (recsByStudent.get(indicator.studentId) ?? []).map((r) => ({

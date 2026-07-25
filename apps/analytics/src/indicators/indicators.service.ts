@@ -7,6 +7,13 @@ import { PaginationDto } from '@minedu/common';
 
 const PRESENT_STATUSES = ['PRESENT', 'LATE'];
 
+const COMPETENCY_SCORE_MAP: Record<string, number> = {
+  BASICO: 0.25,
+  INTERMEDIO: 0.5,
+  AVANZADO: 0.75,
+  LOGRADO: 1.0,
+};
+
 interface AttendanceEventPayload {
   studentId: string;
   classroomId: string;
@@ -18,6 +25,12 @@ interface GradeEventPayload {
   studentId: string;
   classroomId: string;
   score: number;
+}
+
+interface CompetencyEventPayload {
+  studentId: string;
+  classroomId: string;
+  level: string;
 }
 
 @Injectable()
@@ -111,6 +124,26 @@ export class IndicatorsService {
       where: { studentId_classroomId: { studentId, classroomId } },
       update: { gradeSum, gradeCount, avgGrade },
       create: { studentId, classroomId, gradeSum, gradeCount, avgGrade },
+    });
+  }
+
+  async recalculateCompetency(payload: CompetencyEventPayload) {
+    const { studentId, classroomId, level } = payload;
+    const score = COMPETENCY_SCORE_MAP[level] ?? 0;
+
+    const existing = await this.prisma.studentIndicator.findUnique({
+      where: { studentId_classroomId: { studentId, classroomId } },
+    });
+
+    const prevCount = existing?.competencyCount ?? 0;
+    const prevSum = (existing?.competencyScore ?? 0) * prevCount;
+    const newCount = prevCount + 1;
+    const newCompetencyScore = newCount > 0 ? (prevSum + score) / newCount : 0;
+
+    return this.prisma.studentIndicator.upsert({
+      where: { studentId_classroomId: { studentId, classroomId } },
+      update: { competencyScore: newCompetencyScore, competencyCount: newCount },
+      create: { studentId, classroomId, competencyScore: newCompetencyScore, competencyCount: newCount },
     });
   }
 

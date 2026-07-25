@@ -74,8 +74,11 @@ model Competency {
 model StudentCompetency {
   id           String     @id @default(uuid())
   studentId    String
+  classroomId  String
   competencyId String
   competency   Competency @relation(fields: [competencyId], references: [id])
   level        String
   date         DateTime   @default(now())
+
+  @@index([studentId, classroomId])
 }

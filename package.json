@@ -8,6 +8,8 @@
     "dev:gateway": "pnpm --filter gateway start:dev",
     "dev:auth": "pnpm --filter auth start:dev",
     "dev:users": "pnpm --filter users start:dev",
+    "dev:storage": "pnpm --filter storage start:dev",
+    "dev:notifications": "pnpm --filter notifications start:dev",
     "dev:reports": "pnpm --filter reports start:dev",
     "dev:classroom": "pnpm --filter classroom start:dev",
     "dev:analytics": "pnpm --filter analytics start:dev",

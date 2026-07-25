@@ -19,6 +19,8 @@ model StudentIndicator {
   gradeCount         Int      @default(0)
   gradeSum           Float    @default(0)
   participationScore Float    @default(0)
+  competencyScore    Float    @default(0)
+  competencyCount    Int      @default(0)
   updatedAt          DateTime @updatedAt
 
   @@unique([studentId, classroomId])
