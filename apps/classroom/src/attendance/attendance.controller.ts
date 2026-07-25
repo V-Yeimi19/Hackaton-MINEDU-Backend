@@ -22,13 +22,13 @@ export class AttendanceController {
   }
 
   @Get('classroom/:classroomId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
   findByClassroom(@Param('classroomId') classroomId: string) {
     return this.attendanceService.findByClassroom(classroomId);
   }
 
   @Get('student/:studentId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
   findByStudent(@Param('studentId') studentId: string) {
     return this.attendanceService.findByStudent(studentId);
   }

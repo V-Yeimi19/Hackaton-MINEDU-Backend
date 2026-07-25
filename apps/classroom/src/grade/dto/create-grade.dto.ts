@@ -6,7 +6,7 @@ export class CreateGradeDto {
   studentId: string;
 
   @IsUUID()
-  classroomId: string;
+  courseId: string;
 
   @IsString()
   @IsNotEmpty()

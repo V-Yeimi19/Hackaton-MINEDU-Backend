@@ -15,9 +15,8 @@ export class EvaluateCompetencyDto {
   @IsNotEmpty()
   studentId: string;
 
-  @IsString()
-  @IsNotEmpty()
-  classroomId: string;
+  @IsUUID()
+  courseId: string;
 
   @IsEnum(CompetencyLevel)
   level: CompetencyLevel;

@@ -14,7 +14,10 @@ export class CourseService {
   ) {}
 
   async create(dto: CreateCourseDto) {
-    const course = await this.prisma.course.create({ data: dto });
+    const course = await this.prisma.course.create({
+      data: { name: dto.name, classroomId: dto.classroomId },
+      include: { classroom: true },
+    });
     try {
       await this.pubsub.publish(EVENTS.COURSE_CREATED, course);
     } catch (err) {
@@ -24,13 +27,13 @@ export class CourseService {
   }
 
   async findAll() {
-    return this.prisma.course.findMany({ include: { classrooms: true } });
+    return this.prisma.course.findMany({ include: { classroom: true } });
   }
 
   async findOne(id: string) {
     const course = await this.prisma.course.findUnique({
       where: { id },
-      include: { classrooms: true },
+      include: { classroom: true },
     });
     if (!course) {
       throw new NotFoundException('Curso no encontrado');

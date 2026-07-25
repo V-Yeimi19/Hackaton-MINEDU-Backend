@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class UpdateClassroomDto {
   @IsOptional()
@@ -7,6 +7,7 @@ export class UpdateClassroomDto {
   name?: string;
 
   @IsOptional()
-  @IsUUID()
-  courseId?: string;
+  @IsString()
+  @IsNotEmpty()
+  gradeLevel?: string;
 }

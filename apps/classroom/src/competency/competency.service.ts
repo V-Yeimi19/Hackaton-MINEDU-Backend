@@ -18,13 +18,12 @@ export class CompetencyService {
   }
 
   async findAll() {
-    return this.prisma.competency.findMany({ include: { levels: true } });
+    return this.prisma.competency.findMany();
   }
 
   async findOne(id: string) {
     const competency = await this.prisma.competency.findUnique({
       where: { id },
-      include: { levels: true },
     });
     if (!competency) {
       throw new NotFoundException('Competencia no encontrada');
@@ -33,19 +32,26 @@ export class CompetencyService {
   }
 
   async evaluate(dto: EvaluateCompetencyDto) {
-    const competency = await this.findOne(dto.competencyId);
+    await this.findOne(dto.competencyId);
     const evaluation = await this.prisma.studentCompetency.create({
       data: {
         competencyId: dto.competencyId,
         studentId: dto.studentId,
-        classroomId: dto.classroomId,
+        courseId: dto.courseId,
         level: dto.level,
       },
     });
     try {
+      const course = await this.prisma.course.findUnique({
+        where: { id: dto.courseId },
+      });
+      const competency = await this.prisma.competency.findUnique({
+        where: { id: dto.competencyId },
+      });
       await this.pubsub.publish(EVENTS.COMPETENCY_EVALUATED, {
         ...evaluation,
-        competencyName: competency.name,
+        classroomId: course?.classroomId,
+        competencyName: competency?.name,
       });
     } catch (err) {
       this.logger.warn('Fallo publicando evento COMPETENCY_EVALUATED', err);
@@ -56,7 +62,7 @@ export class CompetencyService {
   async findByStudent(studentId: string) {
     return this.prisma.studentCompetency.findMany({
       where: { studentId },
-      include: { competency: true },
+      include: { competency: true, course: true },
       orderBy: { date: 'desc' },
     });
   }

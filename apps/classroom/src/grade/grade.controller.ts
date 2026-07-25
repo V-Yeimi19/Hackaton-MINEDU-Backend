@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard, JwtPayload, RolesGuard, Role, Roles } from '@minedu/common';
+import { JwtAuthGuard, RolesGuard, Role, Roles } from '@minedu/common';
 import { GradeService } from './grade.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { UpdateGradeDto } from './dto/update-grade.dto';
@@ -16,13 +16,13 @@ export class GradeController {
   }
 
   @Get('classroom/:classroomId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
   findByClassroom(@Param('classroomId') classroomId: string) {
     return this.gradeService.findByClassroom(classroomId);
   }
 
   @Get('student/:studentId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
   findByStudent(@Param('studentId') studentId: string) {
     return this.gradeService.findByStudent(studentId);
   }

@@ -5,14 +5,4 @@ export class UpdateCourseDto {
   @IsString()
   @IsNotEmpty()
   name?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  gradeLevel?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  teacherId?: string;
 }

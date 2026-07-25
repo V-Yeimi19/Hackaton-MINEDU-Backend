@@ -6,11 +6,11 @@ describe('Full Pipeline E2E Smoke Test', () => {
   let authToken: string;
   let userId: string;
   let userEmail: string;
-  let courseId: string;
   let classroomId: string;
+  let courseId: string;
 
   describe('1. Auth Flow', () => {
-    it('should register a new user', async () => {
+    it('should register a new DOCENTE user', async () => {
       const testEmail = `test-teacher-${Date.now()}@minedu.edu.pe`;
       const res = await request(GATEWAY_URL)
         .post('/api/auth/register')
@@ -49,47 +49,59 @@ describe('Full Pipeline E2E Smoke Test', () => {
     });
   });
 
-  describe('2. Classroom Flow', () => {
-    it('should create a course', async () => {
-      const res = await request(GATEWAY_URL)
-        .post('/api/classroom/courses')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          name: 'Matematicas E2E',
-          gradeLevel: '3ro Primaria',
-          teacherId: userId || 'teacher-e2e',
-        });
-
-      if (res.status === 201) {
-        expect(res.body.id).toBeDefined();
-        courseId = res.body.id;
-      } else {
-        console.warn(`Course creation: ${res.status}`);
-      }
-    });
-
-    it('should create a classroom', async () => {
-      if (!courseId) return;
-
+  describe('2. Classroom Flow (new model: Classroom -> Courses)', () => {
+    it('should create a classroom (with gradeLevel, no courseId)', async () => {
       const res = await request(GATEWAY_URL)
         .post('/api/classroom/classrooms')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           name: 'Aula E2E',
-          courseId,
+          gradeLevel: '3ro Primaria',
         });
 
       if (res.status === 201) {
         expect(res.body.id).toBeDefined();
+        expect(res.body.gradeLevel).toBe('3ro Primaria');
         classroomId = res.body.id;
       } else {
         console.warn(`Classroom creation: ${res.status}`);
       }
     });
 
+    it('should create a course inside the classroom', async () => {
+      if (!classroomId) return;
+
+      const res = await request(GATEWAY_URL)
+        .post('/api/classroom/courses')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          name: 'Matematicas E2E',
+          classroomId,
+        });
+
+      if (res.status === 201) {
+        expect(res.body.id).toBeDefined();
+        expect(res.body.classroom?.id).toBe(classroomId);
+        courseId = res.body.id;
+      } else {
+        console.warn(`Course creation: ${res.status}`);
+      }
+    });
+
     it('should list classrooms', async () => {
       const res = await request(GATEWAY_URL)
         .get('/api/classroom/classrooms')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect([200, 401]).toContain(res.status);
+      if (res.status === 200) {
+        expect(Array.isArray(res.body)).toBe(true);
+      }
+    });
+
+    it('should list courses', async () => {
+      const res = await request(GATEWAY_URL)
+        .get('/api/classroom/courses')
         .set('Authorization', `Bearer ${authToken}`);
 
       expect([200, 401]).toContain(res.status);

@@ -108,6 +108,7 @@ model Invitation {
   token         String           @unique @default(uuid())
   type          InvitationType
   status        InvitationStatus @default(PENDING)
+  email         String
   institutionId String?
   institution   Institution?     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   classroomId   String?

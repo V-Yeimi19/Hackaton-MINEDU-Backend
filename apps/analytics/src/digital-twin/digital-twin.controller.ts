@@ -9,13 +9,13 @@ export class DigitalTwinController {
   constructor(private readonly digitalTwinService: DigitalTwinService) {}
 
   @Get('classroom/:classroomId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.ESPECIALISTA, Role.DIRECTIVO)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   getClassroomTwin(@Param('classroomId') classroomId: string) {
     return this.digitalTwinService.getClassroomTwin(classroomId);
   }
 
   @Get('classroom/:classroomId/student/:studentId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.ESPECIALISTA, Role.DIRECTIVO)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   getStudentTwin(
     @Param('classroomId') classroomId: string,
     @Param('studentId') studentId: string,

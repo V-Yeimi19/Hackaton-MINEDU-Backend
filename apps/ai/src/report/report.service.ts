@@ -6,11 +6,24 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GenerateReportDto, ReportFilterDto } from './dto/report.dto';
 import PDFDocument from 'pdfkit';
 
+interface EnrollmentData {
+  studentId: string;
+  student: { id: string; fullName: string };
+}
+
+interface CourseData {
+  id: string;
+  name: string;
+  classroomId: string;
+}
+
 interface ClassroomData {
   id: string;
   name: string;
-  studentIds: string[];
-  course: { id: string; name: string; gradeLevel: string; teacherId: string };
+  gradeLevel: string;
+  teacherId: string;
+  courses: CourseData[];
+  enrollments: EnrollmentData[];
 }
 
 interface AttendanceRecord {
@@ -142,6 +155,8 @@ export class ReportService {
       return d >= weekStart && d <= weekEnd;
     });
 
+    const studentIds = classroom.enrollments.map((e) => e.studentId);
+
     const indicatorMap = new Map(indicators.map((i) => [i.studentId, i]));
     const riskMap = new Map<string, RiskRecord[]>();
     for (const r of risks) {
@@ -151,7 +166,7 @@ export class ReportService {
     }
 
     const anomalies: { studentId: string; message: string }[] = [];
-    for (const studentId of classroom.studentIds) {
+    for (const studentId of studentIds) {
       const studentRisks = riskMap.get(studentId) ?? [];
       const latestRisk = studentRisks[0];
       if (latestRisk && latestRisk.level !== 'NONE') {
@@ -177,19 +192,21 @@ export class ReportService {
       }
     }
 
-    const attendanceSummary = this.buildAttendanceSummary(weekAttendances, classroom.studentIds);
+    const attendanceSummary = this.buildAttendanceSummary(weekAttendances, studentIds);
     const gradeSummary = this.buildGradeSummary(weekGrades);
+
+    const firstCourse = classroom.courses[0];
 
     const report = await this.prisma.report.create({
       data: {
         classroomId: dto.classroomId,
-        courseId: classroom.course.id,
-        teacherId: classroom.course.teacherId,
-        courseName: classroom.course.name,
+        courseId: firstCourse?.id ?? '',
+        teacherId: classroom.teacherId,
+        courseName: firstCourse?.name ?? '',
         className: classroom.name,
         weekStart,
         weekEnd,
-        studentCount: classroom.studentIds.length,
+        studentCount: classroom.enrollments.length,
         status: 'GENERATED',
       },
     });
@@ -197,12 +214,12 @@ export class ReportService {
     const pdfBuffer = await this.generatePdf({
       reportId: report.id,
       className: classroom.name,
-      courseName: classroom.course.name,
-      gradeLevel: classroom.course.gradeLevel,
-      teacherId: classroom.course.teacherId,
+      courseName: firstCourse?.name ?? '',
+      gradeLevel: classroom.gradeLevel,
+      teacherId: classroom.teacherId,
       weekStart,
       weekEnd,
-      studentCount: classroom.studentIds.length,
+      studentCount: classroom.enrollments.length,
       attendanceSummary,
       gradeSummary,
       anomalies,

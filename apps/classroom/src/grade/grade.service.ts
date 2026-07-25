@@ -17,13 +17,19 @@ export class GradeService {
     const grade = await this.prisma.grade.create({
       data: {
         studentId: dto.studentId,
-        classroomId: dto.classroomId,
+        courseId: dto.courseId,
         evaluation: dto.evaluation,
         score: dto.score,
       },
     });
     try {
-      await this.pubsub.publish(EVENTS.GRADE_REGISTERED, grade);
+      const course = await this.prisma.course.findUnique({
+        where: { id: dto.courseId },
+      });
+      await this.pubsub.publish(EVENTS.GRADE_REGISTERED, {
+        ...grade,
+        classroomId: course?.classroomId,
+      });
     } catch (err) {
       this.logger.warn('Fallo publicando evento GRADE_REGISTERED', err);
     }
@@ -32,7 +38,8 @@ export class GradeService {
 
   async findByClassroom(classroomId: string) {
     return this.prisma.grade.findMany({
-      where: { classroomId },
+      where: { course: { classroomId } },
+      include: { course: true },
       orderBy: { date: 'desc' },
     });
   }
@@ -40,6 +47,7 @@ export class GradeService {
   async findByStudent(studentId: string) {
     return this.prisma.grade.findMany({
       where: { studentId },
+      include: { course: true },
       orderBy: { date: 'desc' },
     });
   }
@@ -51,7 +59,13 @@ export class GradeService {
     }
     const updated = await this.prisma.grade.update({ where: { id }, data: dto });
     try {
-      await this.pubsub.publish(EVENTS.GRADE_UPDATED, updated);
+      const course = await this.prisma.course.findUnique({
+        where: { id: updated.courseId },
+      });
+      await this.pubsub.publish(EVENTS.GRADE_UPDATED, {
+        ...updated,
+        classroomId: course?.classroomId,
+      });
     } catch (err) {
       this.logger.warn('Fallo publicando evento GRADE_UPDATED', err);
     }

@@ -10,7 +10,7 @@ export class AccessibilityController {
   constructor(private readonly pipelineService: PipelineService) {}
 
   @Post('process')
-  @Roles(Role.ADMIN, Role.DOCENTE, Role.ESPECIALISTA)
+  @Roles(Role.ADMIN, Role.DOCENTE)
   async process(@Body() dto: ProcessContentDto) {
     const result = await this.pipelineService.process(dto);
     return {
@@ -20,7 +20,7 @@ export class AccessibilityController {
   }
 
   @Post('process/audio')
-  @Roles(Role.ADMIN, Role.DOCENTE, Role.ESPECIALISTA)
+  @Roles(Role.ADMIN, Role.DOCENTE)
   async processAndReturnAudio(@Body() dto: ProcessContentDto, @Res() res: Response) {
     const result = await this.pipelineService.process(dto);
     res.set({
@@ -31,7 +31,7 @@ export class AccessibilityController {
   }
 
   @Post('process/worksheet')
-  @Roles(Role.ADMIN, Role.DOCENTE, Role.ESPECIALISTA)
+  @Roles(Role.ADMIN, Role.DOCENTE)
   async processWorksheet(@Body() dto: GenerateWorksheetDto) {
     const result = await this.pipelineService.processWorksheet(dto);
     return {
@@ -41,13 +41,13 @@ export class AccessibilityController {
   }
 
   @Get('jobs')
-  @Roles(Role.ADMIN, Role.DOCENTE, Role.ESPECIALISTA, Role.DIRECTIVO)
+  @Roles(Role.ADMIN, Role.DOCENTE, Role.DIRECTIVO)
   findAll() {
     return this.pipelineService.findAll();
   }
 
   @Get('jobs/:id')
-  @Roles(Role.ADMIN, Role.DOCENTE, Role.ESPECIALISTA, Role.DIRECTIVO)
+  @Roles(Role.ADMIN, Role.DOCENTE, Role.DIRECTIVO)
   findOne(@Param('id') id: string) {
     return this.pipelineService.findOne(id);
   }

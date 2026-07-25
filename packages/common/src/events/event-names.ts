@@ -15,6 +15,12 @@ export const EVENTS = {
   GRADE_UPDATED: 'grade.updated',
   COMPETENCY_EVALUATED: 'competency.evaluated',
 
+  // Invitation / Enrollment
+  INVITATION_CREATED: 'invitation.created',
+  INVITATION_ACCEPTED: 'invitation.accepted',
+  STUDENT_CREATED: 'student.created',
+  ENROLLMENT_CREATED: 'enrollment.created',
+
   // Analytics
   RISK_DETECTED: 'risk.detected',
 

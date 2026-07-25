@@ -50,10 +50,10 @@ describe('AI Service (Integration)', () => {
         .expect(401);
     });
 
-    it('/reports (GET) should reject student role', () => {
+    it('/reports (GET) should reject familiar role', () => {
       return request(app.getHttpServer())
         .get('/reports')
-        .set('Authorization', `Bearer ${TEST_TOKENS.estudiante}`)
+        .set('Authorization', `Bearer ${TEST_TOKENS.familiar}`)
         .expect(403);
     });
   });

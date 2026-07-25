@@ -11,11 +11,24 @@ import {
 } from './dto/report.dto';
 import PDFDocument from 'pdfkit';
 
+interface EnrollmentData {
+  studentId: string;
+  student: { id: string; fullName: string };
+}
+
+interface CourseData {
+  id: string;
+  name: string;
+  classroomId: string;
+}
+
 interface ClassroomData {
   id: string;
   name: string;
-  studentIds: string[];
-  course: { id: string; name: string; gradeLevel: string };
+  gradeLevel: string;
+  teacherId: string;
+  courses: CourseData[];
+  enrollments: EnrollmentData[];
 }
 
 interface AttendanceRecord {
@@ -62,7 +75,7 @@ interface ClassroomSummary {
   className: string;
   courseName: string;
   gradeLevel: string;
-  studentIds: string[];
+  studentCount: number;
   attendanceRate: number;
   avgGrade: number | null;
   riskCounts: RiskCounts;
@@ -101,8 +114,8 @@ export class ReportService {
       }),
     );
     return data.filter((c) => {
-      if (courseId && c.course.id !== courseId) return false;
-      if (gradeLevel && c.course.gradeLevel !== gradeLevel) return false;
+      if (courseId && !c.courses.some((cr) => cr.id === courseId)) return false;
+      if (gradeLevel && c.gradeLevel !== gradeLevel) return false;
       return true;
     });
   }
@@ -194,9 +207,9 @@ export class ReportService {
     return {
       classroomId: classroom.id,
       className: classroom.name,
-      courseName: classroom.course.name,
-      gradeLevel: classroom.course.gradeLevel,
-      studentIds: classroom.studentIds,
+      courseName: classroom.courses[0]?.name ?? '',
+      gradeLevel: classroom.gradeLevel,
+      studentCount: classroom.enrollments.length,
       attendanceRate,
       avgGrade,
       riskCounts,
@@ -223,7 +236,6 @@ export class ReportService {
     let gradeClassroomCount = 0;
 
     for (const s of summaries) {
-      s.studentIds.forEach((id) => studentIds.add(id));
       attendanceRateSum += s.attendanceRate;
       if (s.avgGrade !== null) {
         gradeSum += s.avgGrade;
@@ -234,6 +246,8 @@ export class ReportService {
       });
     }
 
+    const totalStudents = summaries.reduce((sum, s) => sum + s.studentCount, 0);
+
     const report = await this.prisma.institutionReport.create({
       data: {
         gradeLevel: dto.gradeLevel ?? null,
@@ -241,7 +255,7 @@ export class ReportService {
         periodStart,
         periodEnd,
         classroomCount: summaries.length,
-        studentCount: studentIds.size,
+        studentCount: totalStudents,
         avgAttendanceRate: attendanceRateSum / summaries.length,
         avgGrade: gradeClassroomCount > 0 ? gradeSum / gradeClassroomCount : 0,
         riskCounts,
@@ -279,7 +293,7 @@ export class ReportService {
       gradeLevel: dto.gradeLevel ?? 'Todas',
       courseName: dto.courseId ?? 'Todos',
       classroomCount: summaries.length,
-      studentCount: studentIds.size,
+      studentCount: totalStudents,
       avgAttendanceRate: report.avgAttendanceRate,
       avgGrade: report.avgGrade,
       riskCounts,
@@ -381,7 +395,9 @@ export class ReportService {
       if (!latestRiskByStudent.has(r.studentId)) latestRiskByStudent.set(r.studentId, r);
     }
 
-    const studentRows = classroom.studentIds.map((sid) => {
+    const studentIds = classroom.enrollments.map((e) => e.studentId);
+
+    const studentRows = studentIds.map((sid) => {
       const sAttendances = periodAttendances.filter((a) => a.studentId === sid);
       const presentCount = sAttendances.filter((a) => a.status === 'PRESENT').length;
       const attendanceRate = sAttendances.length > 0 ? presentCount / sAttendances.length : 0;
@@ -409,11 +425,11 @@ export class ReportService {
     return this.generateClassroomPdf({
       classroomId: dto.classroomId,
       className: classroom.name,
-      courseName: classroom.course.name,
-      gradeLevel: classroom.course.gradeLevel,
+      courseName: classroom.courses[0]?.name ?? '',
+      gradeLevel: classroom.gradeLevel,
       periodStart,
       periodEnd,
-      studentCount: classroom.studentIds.length,
+      studentCount: classroom.enrollments.length,
       studentRows,
       riskCounts,
     });
@@ -423,7 +439,7 @@ export class ReportService {
     const classroom = await this.fetchClassroomById(dto.classroomId);
     if (!classroom) throw new NotFoundException('Aula no encontrada');
 
-    if (!classroom.studentIds.includes(dto.studentId)) {
+    if (!classroom.enrollments.some((e) => e.studentId === dto.studentId)) {
       throw new NotFoundException('El estudiante no pertenece a esta aula');
     }
 
@@ -462,8 +478,8 @@ export class ReportService {
       studentId: dto.studentId,
       classroomId: dto.classroomId,
       className: classroom.name,
-      courseName: classroom.course.name,
-      gradeLevel: classroom.course.gradeLevel,
+      courseName: classroom.courses[0]?.name ?? '',
+      gradeLevel: classroom.gradeLevel,
       periodStart,
       periodEnd,
       attendanceSummary: {
@@ -726,7 +742,7 @@ export class ReportService {
       s.className,
       s.courseName,
       s.gradeLevel,
-      s.studentIds.length,
+      s.studentCount,
       (s.attendanceRate * 100).toFixed(1),
       s.avgGrade !== null ? s.avgGrade.toFixed(1) : '',
       s.riskCounts.NONE,

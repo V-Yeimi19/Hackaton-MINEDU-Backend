@@ -1,5 +1,5 @@
 import { Body, Controller, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard, Role, Roles, RolesGuard } from '@minedu/common';
+import { InternalKeyGuard, JwtAuthGuard, Role, Roles, RolesGuard } from '@minedu/common';
 import { AuthUser } from '../../generated/prisma';
 import { AuthService } from './auth.service';
 import { ChangeRoleDto } from './dto/change-role.dto';
@@ -26,5 +26,11 @@ export class AuthController {
   @Patch(':authUserId/role')
   changeRole(@Param('authUserId') authUserId: string, @Body() dto: ChangeRoleDto) {
     return this.authService.changeRole(authUserId, dto.role);
+  }
+
+  @UseGuards(InternalKeyGuard)
+  @Post('internal/register')
+  internalRegister(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
   }
 }

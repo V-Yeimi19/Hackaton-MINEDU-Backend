@@ -3,7 +3,6 @@ import { JwtAuthGuard, JwtPayload, RolesGuard, Roles, CurrentUser, Role } from '
 import { ClassroomService } from './classroom.services';
 import { CreateClassroomDto } from './dto/create-classroom.dto';
 import { UpdateClassroomDto } from './dto/update-classroom.dto';
-import { EnrollClassroomDto } from './dto/enroll-classroom.dto';
 
 @Controller('classrooms')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -17,11 +16,13 @@ export class ClassroomController {
   }
 
   @Get()
-  findAll() {
-    return this.classroomService.findAll();
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
+  findAll(@CurrentUser() user: JwtPayload) {
+    return this.classroomService.findAll(user.role, user.sub);
   }
 
   @Get(':id')
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
   findOne(@Param('id') id: string) {
     return this.classroomService.findOne(id);
   }
@@ -38,15 +39,18 @@ export class ClassroomController {
     return this.classroomService.remove(id);
   }
 
-  @Post('enroll')
-  @Roles(Role.ESTUDIANTE)
-  enroll(@Body() dto: EnrollClassroomDto, @CurrentUser() user: JwtPayload) {
-    return this.classroomService.enroll(dto, user.sub);
+  @Get(':id/enrollments')
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
+  getEnrollments(@Param('id') id: string) {
+    return this.classroomService.getEnrollments(id);
   }
 
-  @Post('unenroll')
-  @Roles(Role.ESTUDIANTE)
-  unenroll(@Body() dto: EnrollClassroomDto, @CurrentUser() user: JwtPayload) {
-    return this.classroomService.unenroll(dto, user.sub);
+  @Delete(':id/enrollments/:enrollmentId')
+  @Roles(Role.DOCENTE, Role.ADMIN)
+  removeEnrollment(
+    @Param('id') id: string,
+    @Param('enrollmentId') enrollmentId: string,
+  ) {
+    return this.classroomService.removeEnrollment(id, enrollmentId);
   }
 }

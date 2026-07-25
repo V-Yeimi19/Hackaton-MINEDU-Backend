@@ -12,6 +12,9 @@ import { GradeModule } from './grade/grade.module';
 import { CompetencyModule } from './competency/competency.module';
 import { SupportNeedModule } from './support-need/support-need.module';
 import { InternalModule } from './internal/internal.module';
+import { InstitutionModule } from './institution/institution.module';
+import { InvitationModule } from './invitation/invitation.module';
+import { StudentModule } from './student/student.module';
 
 @Module({
   imports: [
@@ -26,6 +29,9 @@ import { InternalModule } from './internal/internal.module';
     CompetencyModule,
     SupportNeedModule,
     InternalModule,
+    InstitutionModule,
+    InvitationModule,
+    StudentModule,
   ],
   controllers: [HealthController],
 })

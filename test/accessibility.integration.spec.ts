@@ -37,7 +37,7 @@ describe('Accessibility Service (Integration)', () => {
     it('/jobs (GET) should return jobs list', () => {
       return request(app.getHttpServer())
         .get('/jobs')
-        .set('Authorization', `Bearer ${TEST_TOKENS.especialista}`)
+        .set('Authorization', `Bearer ${TEST_TOKENS.docente}`)
         .expect(200)
         .expect((res) => {
           expect(Array.isArray(res.body)).toBe(true);
@@ -50,10 +50,10 @@ describe('Accessibility Service (Integration)', () => {
         .expect(401);
     });
 
-    it('/jobs (GET) should reject student role', () => {
+    it('/jobs (GET) should reject familiar role', () => {
       return request(app.getHttpServer())
         .get('/jobs')
-        .set('Authorization', `Bearer ${TEST_TOKENS.estudiante}`)
+        .set('Authorization', `Bearer ${TEST_TOKENS.familiar}`)
         .expect(403);
     });
 

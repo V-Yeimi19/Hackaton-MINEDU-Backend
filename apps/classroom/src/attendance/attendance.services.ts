@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EVENTS, RedisPubSubService } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
@@ -19,6 +19,21 @@ export class AttendanceService {
     });
     if (!classroom) {
       throw new NotFoundException('Aula no encontrada');
+    }
+
+    const studentIds = dto.records.map((r) => r.studentId);
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: {
+        classroomId: dto.classroomId,
+        studentId: { in: studentIds },
+      },
+    });
+    const enrolledIds = new Set(enrollments.map((e) => e.studentId));
+    const notEnrolled = studentIds.filter((id) => !enrolledIds.has(id));
+    if (notEnrolled.length > 0) {
+      throw new BadRequestException(
+        `Estudiantes no matriculados en esta aula: ${notEnrolled.join(', ')}`,
+      );
     }
 
     const attendances = await Promise.all(

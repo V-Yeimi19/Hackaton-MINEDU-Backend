@@ -8,13 +8,13 @@ export class RecommendationController {
   constructor(private readonly recommendationService: RecommendationService) {}
 
   @Get('classroom/:classroomId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.ESPECIALISTA, Role.DIRECTIVO)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   findByClassroom(@Param('classroomId') classroomId: string, @Query() pagination: PaginationDto) {
     return this.recommendationService.findByClassroom(classroomId, pagination);
   }
 
   @Get('student/:studentId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.ESPECIALISTA, Role.DIRECTIVO, Role.ESTUDIANTE)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
   findByStudent(@Param('studentId') studentId: string, @Query() pagination: PaginationDto) {
     return this.recommendationService.findByStudent(studentId, pagination);
   }

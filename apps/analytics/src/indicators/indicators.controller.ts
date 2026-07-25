@@ -8,13 +8,13 @@ export class IndicatorsController {
   constructor(private readonly indicatorsService: IndicatorsService) {}
 
   @Get('classroom/:classroomId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.ESPECIALISTA, Role.DIRECTIVO)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   findByClassroom(@Param('classroomId') classroomId: string, @Query() pagination: PaginationDto) {
     return this.indicatorsService.findByClassroom(classroomId, pagination);
   }
 
   @Get('student/:studentId/classroom/:classroomId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.ESPECIALISTA, Role.DIRECTIVO, Role.ESTUDIANTE)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
   findByStudentAndClassroom(
     @Param('studentId') studentId: string,
     @Param('classroomId') classroomId: string,
@@ -23,7 +23,7 @@ export class IndicatorsController {
   }
 
   @Get('student/:studentId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.ESPECIALISTA, Role.DIRECTIVO, Role.ESTUDIANTE)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
   findByStudent(@Param('studentId') studentId: string, @Query() pagination: PaginationDto) {
     return this.indicatorsService.findByStudent(studentId, pagination);
   }

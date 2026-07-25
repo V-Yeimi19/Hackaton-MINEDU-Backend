@@ -10,25 +10,25 @@ export class SupportNeedController {
   constructor(private readonly supportNeedService: SupportNeedService) {}
 
   @Post()
-  @Roles(Role.DOCENTE, Role.ESPECIALISTA, Role.ADMIN)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.FAMILIAR)
   create(@Body() dto: CreateSupportNeedDto, @CurrentUser() currentUser: JwtPayload) {
     return this.supportNeedService.create(dto, currentUser.sub);
   }
 
   @Get('student/:studentId')
-  @Roles(Role.DOCENTE, Role.ESPECIALISTA, Role.ADMIN, Role.DIRECTIVO)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
   findByStudent(@Param('studentId') studentId: string) {
     return this.supportNeedService.findByStudent(studentId);
   }
 
   @Patch(':id')
-  @Roles(Role.DOCENTE, Role.ESPECIALISTA, Role.ADMIN)
+  @Roles(Role.DOCENTE, Role.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdateSupportNeedDto) {
     return this.supportNeedService.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles(Role.ESPECIALISTA, Role.ADMIN)
+  @Roles(Role.ADMIN)
   remove(@Param('id') id: string) {
     return this.supportNeedService.remove(id);
   }

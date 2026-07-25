@@ -16,11 +16,13 @@ export class CourseController {
   }
 
   @Get()
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   findAll() {
     return this.courseService.findAll();
   }
 
   @Get(':id')
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   findOne(@Param('id') id: string) {
     return this.courseService.findOne(id);
   }

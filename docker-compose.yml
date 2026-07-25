@@ -156,6 +156,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       REDIS_URL: redis://redis:6379
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -195,6 +202,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
       REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_INTERNAL_URL: http://auth:3001
     ports:
       - '3006:3006'
     depends_on:

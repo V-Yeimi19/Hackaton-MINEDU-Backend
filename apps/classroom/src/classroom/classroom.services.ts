@@ -1,9 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { EVENTS, RedisPubSubService } from '@minedu/common';
+import { EVENTS, RedisPubSubService, Role } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClassroomDto } from './dto/create-classroom.dto';
 import { UpdateClassroomDto } from './dto/update-classroom.dto';
-import { EnrollClassroomDto } from './dto/enroll-classroom.dto';
 
 @Injectable()
 export class ClassroomService {
@@ -15,7 +14,14 @@ export class ClassroomService {
   ) {}
 
   async create(dto: CreateClassroomDto, teacherId: string) {
-    const classroom = await this.prisma.classroom.create({ data: dto });
+    const classroom = await this.prisma.classroom.create({
+      data: {
+        name: dto.name,
+        gradeLevel: dto.gradeLevel,
+        institutionId: dto.institutionId ?? null,
+        teacherId,
+      },
+    });
     try {
       await this.pubsub.publish(EVENTS.CLASSROOM_CREATED, {
         ...classroom,
@@ -27,14 +33,27 @@ export class ClassroomService {
     return classroom;
   }
 
-  async findAll() {
-    return this.prisma.classroom.findMany({ include: { course: true } });
+  async findAll(userRole?: string, userId?: string) {
+    if (userRole === Role.FAMILIAR && userId) {
+      const enrollments = await this.prisma.enrollment.findMany({
+        where: { familiarId: userId },
+        select: { classroomId: true },
+      });
+      const classroomIds = [...new Set(enrollments.map((e) => e.classroomId))];
+      return this.prisma.classroom.findMany({
+        where: { id: { in: classroomIds } },
+        include: { courses: true, enrollments: { include: { student: true } } },
+      });
+    }
+    return this.prisma.classroom.findMany({
+      include: { courses: true, enrollments: { include: { student: true } } },
+    });
   }
 
   async findOne(id: string) {
     const classroom = await this.prisma.classroom.findUnique({
       where: { id },
-      include: { course: true },
+      include: { courses: true },
     });
     if (!classroom) {
       throw new NotFoundException('Aula no encontrada');
@@ -61,39 +80,30 @@ export class ClassroomService {
     await this.prisma.classroom.delete({ where: { id } });
   }
 
-  async enroll(dto: EnrollClassroomDto, studentId: string) {
-    const classroom = await this.findOne(dto.classroomId);
-    const newStudentIds = [...new Set([...classroom.studentIds, studentId])];
-    const updated = await this.prisma.classroom.update({
-      where: { id: dto.classroomId },
-      data: { studentIds: newStudentIds },
+  async getEnrollments(classroomId: string) {
+    await this.findOne(classroomId);
+    return this.prisma.enrollment.findMany({
+      where: { classroomId },
+      include: { student: true },
     });
-    try {
-      await this.pubsub.publish(EVENTS.STUDENT_ENROLLED, {
-        classroomId: dto.classroomId,
-        studentId,
-      });
-    } catch (err) {
-      this.logger.warn('Fallo publicando evento STUDENT_ENROLLED', err);
-    }
-    return updated;
   }
 
-  async unenroll(dto: EnrollClassroomDto, studentId: string) {
-    const classroom = await this.findOne(dto.classroomId);
-    const newStudentIds = classroom.studentIds.filter((id) => id !== studentId);
-    const updated = await this.prisma.classroom.update({
-      where: { id: dto.classroomId },
-      data: { studentIds: newStudentIds },
+  async removeEnrollment(classroomId: string, enrollmentId: string) {
+    await this.findOne(classroomId);
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
     });
+    if (!enrollment || enrollment.classroomId !== classroomId) {
+      throw new NotFoundException('Matrícula no encontrada en esta aula');
+    }
+    await this.prisma.enrollment.delete({ where: { id: enrollmentId } });
     try {
       await this.pubsub.publish(EVENTS.STUDENT_UNENROLLED, {
-        classroomId: dto.classroomId,
-        studentId,
+        classroomId,
+        studentId: enrollment.studentId,
       });
     } catch (err) {
       this.logger.warn('Fallo publicando evento STUDENT_UNENROLLED', err);
     }
-    return updated;
   }
 }

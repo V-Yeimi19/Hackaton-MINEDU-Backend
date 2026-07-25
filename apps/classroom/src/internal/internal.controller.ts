@@ -11,7 +11,7 @@ export class InternalController {
   getClassroom(@Param('id') id: string) {
     return this.prisma.classroom.findUnique({
       where: { id },
-      include: { course: true },
+      include: { courses: true, enrollments: { include: { student: true } } },
     });
   }
 
@@ -24,25 +24,43 @@ export class InternalController {
   }
 
   @Get('classroom/:id/grades')
-  getGrades(@Param('id') id: string) {
+  async getGrades(@Param('id') id: string) {
     return this.prisma.grade.findMany({
-      where: { classroomId: id },
+      where: { course: { classroomId: id } },
+      include: { course: true },
       orderBy: { date: 'desc' },
     });
   }
 
   @Get('classrooms')
   getAllClassrooms() {
-    return this.prisma.classroom.findMany({ include: { course: true } });
+    return this.prisma.classroom.findMany({
+      include: { courses: true, enrollments: { include: { student: true } } },
+    });
   }
 
   @Get('courses')
   getAllCourses() {
-    return this.prisma.course.findMany({ include: { classrooms: true } });
+    return this.prisma.course.findMany({ include: { classroom: true } });
   }
 
   @Get('support-needs/student/:studentId')
   getSupportNeeds(@Param('studentId') studentId: string) {
     return this.prisma.studentSupportNeed.findMany({ where: { studentId } });
+  }
+
+  @Get('classroom/:id/enrollments')
+  getEnrollments(@Param('id') id: string) {
+    return this.prisma.enrollment.findMany({
+      where: { classroomId: id },
+      include: { student: true },
+    });
+  }
+
+  @Get('students/familiar/:familiarId')
+  getStudentsByFamiliar(@Param('familiarId') familiarId: string) {
+    return this.prisma.student.findMany({
+      where: { familiarId },
+    });
   }
 }
