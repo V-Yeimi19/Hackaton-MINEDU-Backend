@@ -125,7 +125,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/storage_db
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
-      MINIO_ENDPOINT: minio
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio}
       MINIO_PORT: 9000
       MINIO_USE_SSL: 'false'
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minedu}
