@@ -18,7 +18,7 @@
 
 - [ ] **Todo el stack corre en HTTP plano, sin TLS** (Gateway, MinIO expuesto por IP pública).
 - [x] ~~`espeak-ng` como TTS es funcional pero de calidad robótica.~~ Resuelto 2026-07-25: `AudioService` (Accessibility) ahora usa ElevenLabs (`@elevenlabs/elevenlabs-js`, modelo `eleven_multilingual_v2`) en vez de `espeak-ng`. Requiere `ELEVENLABS_API_KEY` (Joi la exige, el servicio no arranca sin ella) y opcionalmente `ELEVENLABS_VOICE_ID` (default `JBFqnCBsd6RMkjVDRZzb`). El binario `espeak-ng` ya no se instala en el Dockerfile de runtime.
-- [ ] **Reports (CSV) no tiene versión PDF ni generación automática por cron**, a diferencia de AI (que sí tiene ambas para su reporte por aula). Si se quiere paridad, replicar el patrón de `ScheduleService` de AI.
+- [x] ~~Reports (CSV) no tiene versión PDF ni generación automática por cron~~, a diferencia de AI (que sí tiene ambas para su reporte por aula). **Resuelto 2026-07-25:** Reports ahora genera PDF (`pdfkit`) además de CSV, con `POST /reports/generate/pdf` y `GET /reports/:id/download/pdf`. Se agregó `ScheduleService` con `@Cron(CronExpression.EVERY_WEEK)` que genera un reporte institucional automático sin filtros (todas las aulas, últimos 7 días). `pdfFileId` agregado a `InstitutionReport` (migración `add_pdf_file_id`). `ReportModule` ahora exporta `ReportService` para que el schedule module lo inyecte.
 
 ## Decisiones ya tomadas (no reabrir sin razón)
 

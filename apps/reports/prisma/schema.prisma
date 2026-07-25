@@ -20,6 +20,7 @@ model InstitutionReport {
   avgGrade          Float
   riskCounts        Json
   fileId            String?
+  pdfFileId         String?   // PDF report, added 2026-07-25
   generatedBy       String
   createdAt         DateTime @default(now())
 

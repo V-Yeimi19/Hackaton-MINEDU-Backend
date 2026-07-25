@@ -239,13 +239,14 @@ erDiagram
         float avgAttendanceRate
         float avgGrade
         json riskCounts "conteo por nivel: NONE/LOW/MEDIUM/HIGH"
-        string fileId "id en storage_db.FileObject, opcional"
-        string generatedBy "sub del usuario que lo pidio"
+        string fileId "id en storage_db.FileObject, CSV, opcional"
+        string pdfFileId "id en storage_db.FileObject, PDF, opcional, agregado 2026-07-25"
+        string generatedBy "sub del usuario que lo pidio, o 'system' si es cron"
         datetime createdAt
     }
 ```
 
-Reporte agregado **multi-aula**. No hay un modelo `scope`/enum explícito: si `gradeLevel` y `courseId` son ambos `null`, el reporte es institucional completo; si alguno está seteado, fue filtrado por ese criterio. `riskCounts` es la única columna `Json`/`JSONB` de todo el sistema (el resto de conteos agregados son columnas numéricas planas).
+Reporte agregado **multi-aula**. No hay un modelo `scope`/enum explícito: si `gradeLevel` y `courseId` son ambos `null`, el reporte es institucional completo; si alguno está seteado, fue filtrado por ese criterio. `riskCounts` es la única columna `Json`/`JSONB` de todo el sistema (el resto de conteos agregados son columnas numéricas planas). `fileId` almacena el CSV, `pdfFileId` almacena el PDF (ambos subidos a Storage vía `POST /internal/upload`). `generatedBy` es `'system'` cuando el reporte lo genera el cron semanal automático.
 
 ## Resumen: qué servicio es dueño de qué dato
 
@@ -258,7 +259,7 @@ Reporte agregado **multi-aula**. No hay un modelo `scope`/enum explícito: si `g
 | Cursos, aulas, matrícula, asistencia, notas, competencias | Classroom | Analytics (vía eventos), AI y Reports (vía HTTP interno, solo lectura) |
 | Indicadores, riesgo, recomendaciones | Analytics | AI y Reports (vía HTTP interno, solo lectura) |
 | Reportes PDF por aula | AI | — |
-| Reportes CSV institucionales | Reports | — |
+| Reportes CSV+PDF institucionales | Reports | — |
 | Jobs de accesibilidad | Accessibility | — |
 
 Ningún servicio escribe en la base de datos de otro directamente — toda escritura cruzada pasa por un endpoint HTTP (`/internal/*` o público) del servicio dueño.

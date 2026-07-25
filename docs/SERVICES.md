@@ -109,12 +109,19 @@ Pipeline de accesibilidad para material educativo: OCR → adaptación de texto 
 
 ## Reports — puerto 3005, DB `reports_db`
 
-Reportes **institucionales agregados, multi-aula**, para `ADMIN`/`DIRECTIVO`. Implementado 2026-07-25 (antes era un stub).
+Reportes **institucionales agregados, multi-aula**, para `ADMIN`/`DIRECTIVO`. Implementado 2026-07-25 (antes era un stub). PDF + cron agregados 2026-07-25. Reportes por aula/estudiante agregados 2026-07-25.
 
-- `ReportController` (`@Controller()` vacío, todo bajo rol `ADMIN`/`DIRECTIVO`) — `POST /generate` (body `{ gradeLevel?, courseId?, periodStart, periodEnd }`), `GET /`, `GET /:id`, `GET /:id/download` (302 a Storage).
-- `generateReport`: pide todas las aulas a Classroom (filtradas por `gradeLevel`/`courseId` si se pasan), para cada una trae asistencias+notas del periodo y riesgo actual de Analytics, calcula tasa de asistencia y promedio institucional + distribución de riesgo, arma un CSV, lo sube a Storage.
-- Depende de (HTTP interno, síncrono): **Classroom**, **Analytics**, **Storage** — los mismos tres que AI, reutilizando exactamente los mismos endpoints internos.
-- No publica eventos.
+**Reporte institucional** (solo `ADMIN`/`DIRECTIVO`):
+- `POST /generate` (body `{ gradeLevel?, courseId?, periodStart, periodEnd }`) genera CSV+PDF; `POST /generate/pdf` devuelve el binario PDF directo; `GET /`, `GET /:id`, `GET /:id/download` (302 a Storage para CSV), `GET /:id/download/pdf` (302 a Storage para PDF).
+- `ScheduleService` (`@nestjs/schedule`, cron semanal) genera un reporte automático sin filtros (todas las aulas, últimos 7 días, `generatedBy: 'system'`).
+
+**Reporte por aula** (`ADMIN`/`DIRECTIVO`/`DOCENTE`):
+- `POST /generate/classroom` (body `{ classroomId, periodStart, periodEnd }`) — genera PDF on-demand con asistencia/promedio/riesgo por estudiante del aula en el periodo. No persiste en DB.
+
+**Reporte por estudiante** (`ADMIN`/`DIRECTIVO`/`DOCENTE`):
+- `POST /generate/student` (body `{ studentId, classroomId, periodStart, periodEnd }`) — genera PDF on-demand con asistencia, calificaciones, competencia, riesgo y recomendaciones del estudiante en el periodo. No persiste en DB.
+
+Los reportes por aula/estudiante reutilizan los mismos endpoints internos de Classroom/Analytics (`/internal/classroom/:id`, `/attendances`, `/grades`, `/internal/indicators/classroom/:id`, `/internal/risk/classroom/:id`, `/internal/recommendations/classroom/:id`). El controlador usa `@Roles()` por endpoint (no a nivel de clase) para mezclar `ADMIN`/`DIRECTIVO` en los endpoints institucionales y `ADMIN`/`DIRECTIVO`/`DOCENTE` en los de aula/estudiante.
 
 ### AI vs Reports
 
@@ -122,11 +129,12 @@ Coexisten a propósito, con alcance distinto — si tocas la lógica de agregaci
 
 | | AI (`/api/ai/reports`) | Reports (`/api/reports`) |
 |---|---|---|
-| Alcance | **1 aula** por reporte | **N aulas** (todas, o filtradas por grado/curso) |
-| Quién lo pide | `DOCENTE`, `ADMIN`, `DIRECTIVO` | solo `ADMIN`, `DIRECTIVO` |
-| Salida | PDF (`pdfkit`) | CSV |
-| Automatización | cron semanal (`ScheduleService`) | solo bajo demanda |
-| Caso de uso | "reporte de mi aula esta semana" (docente) | "estado general del colegio este mes" (dirección) |
+| Alcance | **1 aula** por reporte | **N aulas** (institucional), **1 aula**, **1 estudiante** |
+| Quién lo pide | `DOCENTE`, `ADMIN`, `DIRECTIVO` | Institucional: `ADMIN`, `DIRECTIVO`. Aula/Estudiante: `ADMIN`, `DIRECTIVO`, `DOCENTE` |
+| Salida | PDF (`pdfkit`) | CSV + PDF (`pdfkit`) institucional; PDF on-demand por aula/estudiante |
+| Automatización | cron semanal (`ScheduleService`) | cron semanal (`ScheduleService`) — solo institucional |
+| Persistencia | DB `ai_db` + Storage | DB `reports_db` + Storage (institucional); on-demand sin persistir (aula/estudiante) |
+| Caso de uso | "reporte de mi aula esta semana" (docente) | "estado general del colegio" (dirección), "detalle de mi aula" (docente), "detalle de un estudiante" (docente) |
 
 ## Catálogo de eventos
 
