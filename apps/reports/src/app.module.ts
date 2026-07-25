@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthController } from './health/health.controller';
 import { ReportModule } from './report/report.module';
+import { ScheduleJobModule } from './schedule/schedule.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ReportModule } from './report/report.module';
     RedisPubSubModule,
     AuthModule,
     ReportModule,
+    ScheduleJobModule,
   ],
   controllers: [HealthController],
 })
