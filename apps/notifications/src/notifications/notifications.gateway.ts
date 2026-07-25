@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
 
-@WebSocketGateway({ cors: { origin: '*' }, namespace: '/notifications' })
+@WebSocketGateway({ cors: { origin: '*' }, namespace: '/notifications', path: '/ws/notifications' })
 export class NotificationsGateway implements OnGatewayConnection {
   @WebSocketServer()
   server: Server;

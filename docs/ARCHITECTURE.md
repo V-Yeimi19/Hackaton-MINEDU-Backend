@@ -48,12 +48,13 @@ flowchart TB
     STORAGE --> MINIO[(MinIO)]
     NOTIF -->|BullMQ + WebSocket /notifications| REDIS
 
-    Client -.->|"WS directo, no pasa por Gateway"| NOTIF
+    Client -.->|"WS vía /ws/notifications, proxiado"| GW
+    GW -.->|upgrade proxy| NOTIF
 ```
 
 Puntos clave de esta topología:
 
-- **El Gateway es el único punto de entrada HTTP público** (excepto el WebSocket de Notifications, que el cliente conecta directo — no hay proxy de upgrade requests todavía).
+- **El Gateway es el único punto de entrada HTTP y WebSocket público.** El WS de Notifications ya no se conecta directo: el cliente hace `io('http://<gateway>:3000/notifications', { path: '/ws/notifications', auth: { token } })` y el Gateway proxya el `upgrade` hacia Notifications (`http-proxy-middleware`, `ws: true`, enganchado al evento `upgrade` del `http.Server` en `apps/gateway/src/main.ts`). El puerto `3004` de Notifications ya no está publicado en `docker-compose.yml`.
 - **Las llamadas `internal/*` (líneas punteadas) van servicio-a-servicio, sin pasar por el Gateway**, autenticadas con el header `x-internal-key` (`InternalKeyGuard` de `@minedu/common`), nunca con JWT de usuario.
 - **Cada servicio con base de datos tiene su propia DB Postgres** (`<servicio>_db`), nunca comparten esquema. No hay una DB "central" ni foreign keys entre servicios — la unica forma de referenciar datos de otro servicio es por HTTP interno o por eventos.
 - **AI y Reports son los únicos servicios "agregadores"**: no tienen su propio dominio de datos operacional, sino que combinan datos de Classroom + Analytics (+ Storage para persistir el resultado). Ver la distinción entre ambos en [SERVICES.md](./SERVICES.md#ai-vs-reports).

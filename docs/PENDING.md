@@ -1,6 +1,6 @@
 # Pendientes
 
-Última actualización: 2026-07-25. Snapshot de lo que quedó sin resolver tras implementar Reports, desplegar el stack completo en un VPS, reemplazar OpenAI por Groq + `espeak-ng` en Accessibility, y resolver la sincronización de rol Auth↔Users. Ver [ARCHITECTURE.md](./ARCHITECTURE.md), [SERVICES.md](./SERVICES.md) y [DATABASE.md](./DATABASE.md) para el estado completo del sistema — esta lista es solo lo que falta.
+Última actualización: 2026-07-25. Snapshot de lo que quedó sin resolver tras implementar Reports, desplegar el stack completo en un VPS, reemplazar OpenAI por Groq + `espeak-ng` en Accessibility, y resolver la sincronización de rol Auth↔Users + el WebSocket de Notifications detrás del Gateway. Ver [ARCHITECTURE.md](./ARCHITECTURE.md), [SERVICES.md](./SERVICES.md) y [DATABASE.md](./DATABASE.md) para el estado completo del sistema — esta lista es solo lo que falta.
 
 ## Funcionalidad incompleta dentro de servicios ya implementados
 
@@ -10,7 +10,7 @@
 
 ## Infraestructura / plataforma
 
-- [ ] **WebSocket de Notifications no pasa por el Gateway.** El cliente se conecta directo a `NOTIFICATIONS_SERVICE_URL`, saltándose el punto de entrada único. Pendiente si se necesita centralizar (proxy de upgrade requests con `http-proxy-middleware`).
+- [x] ~~WebSocket de Notifications no pasa por el Gateway.~~ Resuelto 2026-07-25: `/ws/notifications` se proxya desde el Gateway (`http-proxy-middleware`, `ws: true`, hook en el evento `upgrade`) hacia Notifications; el puerto `3004` ya no está publicado directamente. Cliente: `io('http://<gateway>:3000/notifications', { path: '/ws/notifications', auth: { token } })`.
 - [ ] **Sin CI/CD.** No hay `.github/workflows` — nada corre `pnpm test`/`test:e2e`/lint automáticamente en cada push o PR. Todo lo validado hasta ahora fue manual.
 - [ ] **Sin tests unitarios.** Solo existen `test/*.integration.spec.ts` (bootean el `AppModule` completo) y `test/e2e.smoke.spec.ts`. La lógica de negocio más específica (`risk.rules.ts`, `recommendation.rules.ts`, cálculo de indicadores en `indicators.service.ts`) no tiene ningún test aislado.
 

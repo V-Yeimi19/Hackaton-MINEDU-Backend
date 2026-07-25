@@ -1,3 +1,5 @@
+import type { IncomingMessage } from 'http';
+import type { Socket } from 'net';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -33,6 +35,18 @@ async function bootstrap() {
 
   const jwtCheck = createJwtCheckMiddleware(configService.get<string>('JWT_SECRET') as string);
 
+  const notificationsTarget = configService.get<string>('NOTIFICATIONS_SERVICE_URL');
+  let notificationsWsProxy: ReturnType<typeof createProxyMiddleware> | undefined;
+  if (notificationsTarget) {
+    notificationsWsProxy = createProxyMiddleware({
+      target: notificationsTarget,
+      changeOrigin: true,
+      ws: true,
+    });
+    app.use('/ws/notifications', notificationsWsProxy);
+    logger.log(`WS proxy ready: /ws/notifications -> ${notificationsTarget}`);
+  }
+
   for (const route of serviceRoutes) {
     const target = configService.get<string>(route.envKey);
     if (!target) {
@@ -59,6 +73,19 @@ async function bootstrap() {
 
   const port = configService.get<number>('GATEWAY_PORT') ?? 3000;
   await app.listen(port);
+
+  if (notificationsWsProxy) {
+    const wsProxy = notificationsWsProxy as unknown as {
+      upgrade: (req: IncomingMessage, socket: Socket, head: Buffer) => void;
+    };
+    const httpServer = app.getHttpServer();
+    httpServer.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
+      if (req.url?.startsWith('/ws/notifications')) {
+        wsProxy.upgrade(req, socket, head);
+      }
+    });
+  }
+
   logger.log(`Gateway listening on port ${port}`);
 }
 

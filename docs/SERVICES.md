@@ -12,6 +12,7 @@ Ficha por servicio. "Endpoints públicos" son los que el Gateway proxya bajo `/a
 - `apps/gateway/src/config/services.config.ts` — tabla de ruteo: 9 entradas (`auth` público, el resto requiere JWT).
 - Rate limiting con headers `RateLimit-*`.
 - `GET /api/health` — health check propio.
+- **Proxy de WebSocket**: `/ws/notifications` se proxya con `http-proxy-middleware` (`ws: true`) hacia Notifications, enganchando el evento `upgrade` del `http.Server` subyacente (`apps/gateway/src/main.ts`, después de `app.listen()`). Es un pipe de transporte — no revalida el JWT, eso lo sigue haciendo Notifications en `handleConnection`.
 
 ## Auth — puerto 3001, DB `auth_db`
 
@@ -58,7 +59,7 @@ Guarda archivos binarios (subidos por usuarios o generados por otros servicios: 
 - `GET /` (JWT) — notificaciones del usuario autenticado.
 - `PATCH /:id/read` (JWT).
 - Se suscribe a `user.created` (`events-subscriber.service.ts`) → encola notificación de bienvenida vía BullMQ (cola `notifications`) → `NotificationsProcessor` persiste en Postgres y empuja por WebSocket.
-- **WebSocket namespace `/notifications`**, autenticado con el JWT en `handshake.auth.token`. El cliente se conecta **directo a `NOTIFICATIONS_SERVICE_URL`, no pasa por el Gateway** (no hay proxy de upgrade requests todavía).
+- **WebSocket namespace `/notifications`, path `/ws/notifications`**, autenticado con el JWT en `handshake.auth.token`. El cliente se conecta a través del **Gateway** (`io('http://<gateway-host>:3000/notifications', { path: '/ws/notifications', auth: { token } })`) — el Gateway proxya el `upgrade` hacia `NOTIFICATIONS_SERVICE_URL`, que ya no está publicado directamente (puerto `3004` sin `ports:` en `docker-compose.yml`, solo alcanzable dentro de la red Docker).
 
 ## Classroom — puerto 3006, DB `classroom_db`
 
