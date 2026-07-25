@@ -29,23 +29,21 @@ export class InvitationController {
   }
 
   @Post('accept/teacher')
-  acceptTeacherInvitation(@Body() dto: AcceptTeacherInvitationDto) {
-    return this.invitationService.acceptTeacherInvitation(dto);
+  @Roles(Role.DOCENTE)
+  acceptTeacherInvitation(
+    @Body() dto: AcceptTeacherInvitationDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.invitationService.acceptTeacherInvitation(dto, user.sub);
   }
 
   @Post('accept/family')
-  @UseGuards(JwtAuthGuard)
   @Roles(Role.FAMILIAR)
   acceptFamilyInvitation(
     @Body() dto: AcceptFamilyInvitationDto,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.invitationService.acceptFamilyInvitation(dto, user.sub);
-  }
-
-  @Get('token/:token')
-  findByToken(@Param('token') token: string) {
-    return this.invitationService.findByToken(token);
   }
 
   @Get('pending/institution/:institutionId')

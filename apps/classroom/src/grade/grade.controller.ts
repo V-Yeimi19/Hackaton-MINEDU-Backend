@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard, RolesGuard, Role, Roles } from '@minedu/common';
+import { JwtAuthGuard, JwtPayload, RolesGuard, Role, Roles, CurrentUser } from '@minedu/common';
 import { GradeService } from './grade.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { UpdateGradeDto } from './dto/update-grade.dto';
@@ -11,8 +11,8 @@ export class GradeController {
 
   @Post()
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  create(@Body() dto: CreateGradeDto) {
-    return this.gradeService.create(dto);
+  create(@Body() dto: CreateGradeDto, @CurrentUser() user: JwtPayload) {
+    return this.gradeService.create(dto, user.sub, user.role);
   }
 
   @Get('classroom/:classroomId')
@@ -29,13 +29,13 @@ export class GradeController {
 
   @Patch(':id')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  update(@Param('id') id: string, @Body() dto: UpdateGradeDto) {
-    return this.gradeService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateGradeDto, @CurrentUser() user: JwtPayload) {
+    return this.gradeService.update(id, dto, user.sub, user.role);
   }
 
   @Delete(':id')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  remove(@Param('id') id: string) {
-    return this.gradeService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.gradeService.remove(id, user.sub, user.role);
   }
 }

@@ -1,5 +1,5 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { EVENTS, RedisPubSubService } from '@minedu/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { EVENTS, RedisPubSubService, Role } from '@minedu/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
@@ -13,12 +13,15 @@ export class AttendanceService {
     private pubsub: RedisPubSubService,
   ) {}
 
-  async create(dto: CreateAttendanceDto, teacherId: string) {
+  async create(dto: CreateAttendanceDto, teacherId: string, userRole: string) {
     const classroom = await this.prisma.classroom.findUnique({
       where: { id: dto.classroomId },
     });
     if (!classroom) {
       throw new NotFoundException('Aula no encontrada');
+    }
+    if (userRole === Role.DOCENTE && classroom.teacherId !== teacherId) {
+      throw new ForbiddenException('No tienes permiso para registrar asistencia en esta aula');
     }
 
     const studentIds = dto.records.map((r) => r.studentId);
@@ -77,10 +80,16 @@ export class AttendanceService {
     return attendances;
   }
 
-  async update(id: string, dto: UpdateAttendanceDto) {
+  async update(id: string, dto: UpdateAttendanceDto, userId: string, userRole: string) {
     const previous = await this.prisma.attendance.findUnique({ where: { id } });
     if (!previous) {
       throw new NotFoundException('Registro de asistencia no encontrado');
+    }
+    if (userRole === Role.DOCENTE) {
+      const classroom = await this.prisma.classroom.findUnique({ where: { id: previous.classroomId } });
+      if (!classroom || classroom.teacherId !== userId) {
+        throw new ForbiddenException('No tienes permiso para editar esta asistencia');
+      }
     }
 
     const updated = await this.prisma.attendance.update({

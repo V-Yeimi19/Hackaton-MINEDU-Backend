@@ -12,13 +12,13 @@ export class AttendanceController {
   @Post()
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
   create(@Body() dto: CreateAttendanceDto, @CurrentUser() user: JwtPayload) {
-    return this.attendanceService.create(dto, user.sub);
+    return this.attendanceService.create(dto, user.sub, user.role);
   }
 
   @Patch(':id')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  update(@Param('id') id: string, @Body() dto: UpdateAttendanceDto) {
-    return this.attendanceService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateAttendanceDto, @CurrentUser() user: JwtPayload) {
+    return this.attendanceService.update(id, dto, user.sub, user.role);
   }
 
   @Get('classroom/:classroomId')

@@ -5,13 +5,9 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { HttpService } from '@nestjs/axios';
-import { EVENTS, RedisPubSubService, Role } from '@minedu/common';
+import { EVENTS, RedisPubSubService } from '@minedu/common';
 import { randomBytes } from 'crypto';
-import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTeacherInvitationDto } from './dto/create-teacher-invitation.dto';
 import { CreateFamilyInvitationDto } from './dto/create-family-invitation.dto';
@@ -24,8 +20,6 @@ export class InvitationService {
   constructor(
     private prisma: PrismaService,
     private pubsub: RedisPubSubService,
-    private config: ConfigService,
-    private http: HttpService,
   ) {}
 
   private generateToken(): string {
@@ -98,7 +92,7 @@ export class InvitationService {
     return invitation;
   }
 
-  async acceptTeacherInvitation(dto: AcceptTeacherInvitationDto) {
+  async acceptTeacherInvitation(dto: AcceptTeacherInvitationDto, teacherId: string) {
     const invitation = await this.prisma.invitation.findUnique({
       where: { token: dto.token },
     });
@@ -115,41 +109,17 @@ export class InvitationService {
       throw new BadRequestException('La invitación ha expirado');
     }
 
-    const existingUser = await this.prisma.invitation.findFirst({
+    const alreadyMember = await this.prisma.institutionTeacher.findUnique({
       where: {
-        type: 'TEACHER_TO_INSTITUTION',
-        email: dto.email,
-        status: 'ACCEPTED',
+        institutionId_teacherId: {
+          institutionId: invitation.institutionId!,
+          teacherId,
+        },
       },
     });
-    if (existingUser) {
-      throw new ConflictException('Este correo ya aceptó una invitación de docente');
+    if (alreadyMember) {
+      throw new ConflictException('Ya eres miembro de esta institución');
     }
-
-    const authInternalUrl = this.config.get<string>('AUTH_SERVICE_INTERNAL_URL');
-    const internalKey = this.config.get<string>('INTERNAL_API_KEY');
-
-    let authResponse: { accessToken: string; user: { id: string; email: string; role: string } };
-    try {
-      const response = await firstValueFrom(
-        this.http.post(
-          `${authInternalUrl}/internal/register`,
-          {
-            email: dto.email,
-            password: dto.password,
-            fullName: dto.fullName,
-            role: Role.DOCENTE,
-          },
-          { headers: { 'x-internal-key': internalKey } },
-        ),
-      );
-      authResponse = response.data;
-    } catch (err) {
-      this.logger.error('Error creando usuario en Auth', err);
-      throw new BadRequestException('No se pudo crear la cuenta del docente');
-    }
-
-    const teacherId = authResponse.user.id;
 
     await this.prisma.institutionTeacher.create({
       data: {
@@ -184,13 +154,13 @@ export class InvitationService {
         type: invitation.type,
         usedBy: teacherId,
         createdBy: invitation.createdBy,
-        email: dto.email,
+        email: invitation.email,
       });
     } catch (err) {
       this.logger.warn('Fallo publicando evento INVITATION_ACCEPTED', err);
     }
 
-    return authResponse;
+    return { message: 'Invitación aceptada correctamente' };
   }
 
   async acceptFamilyInvitation(dto: AcceptFamilyInvitationDto, familiarId: string) {

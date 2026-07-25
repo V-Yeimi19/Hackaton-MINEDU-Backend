@@ -6,5 +6,4 @@ export const envValidationSchema = Joi.object({
   JWT_SECRET: Joi.string().required(),
   INTERNAL_API_KEY: Joi.string().required(),
   REDIS_URL: Joi.string().default('redis://localhost:6379'),
-  AUTH_SERVICE_INTERNAL_URL: Joi.string().required(),
 });

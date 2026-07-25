@@ -29,14 +29,18 @@ export class ClassroomController {
 
   @Patch(':id')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  update(@Param('id') id: string, @Body() dto: UpdateClassroomDto) {
-    return this.classroomService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateClassroomDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.classroomService.update(id, dto, user.sub, user.role);
   }
 
   @Delete(':id')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  remove(@Param('id') id: string) {
-    return this.classroomService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.classroomService.remove(id, user.sub, user.role);
   }
 
   @Get(':id/enrollments')
