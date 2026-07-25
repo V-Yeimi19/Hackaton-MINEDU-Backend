@@ -78,13 +78,24 @@ export class ClassroomService {
     return this.prisma.classroom.findMany({ include });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, userId?: string, userRole?: string) {
     const classroom = await this.prisma.classroom.findUnique({
       where: { id },
       include: { courses: true },
     });
     if (!classroom) {
       throw new NotFoundException('Aula no encontrada');
+    }
+    if (userRole === Role.DOCENTE && classroom.teacherId !== userId) {
+      throw new ForbiddenException('No tienes acceso a esta aula');
+    }
+    if (userRole === Role.FAMILIAR && userId) {
+      const enrollment = await this.prisma.enrollment.findFirst({
+        where: { classroomId: id, familiarId: userId },
+      });
+      if (!enrollment) {
+        throw new ForbiddenException('No tienes acceso a esta aula');
+      }
     }
     return classroom;
   }

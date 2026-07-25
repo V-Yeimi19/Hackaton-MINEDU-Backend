@@ -1,6 +1,6 @@
 // digital-twin/digital-twin.controller.ts
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard, RolesGuard, Roles, Role } from '@minedu/common';
+import { JwtAuthGuard, RolesGuard, Roles, Role, CurrentUser, JwtPayload } from '@minedu/common';
 import { DigitalTwinService } from './digital-twin.service';
 
 @Controller('digital-twin')
@@ -15,11 +15,12 @@ export class DigitalTwinController {
   }
 
   @Get('classroom/:classroomId/student/:studentId')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
   getStudentTwin(
     @Param('classroomId') classroomId: string,
     @Param('studentId') studentId: string,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.digitalTwinService.getStudentTwin(studentId, classroomId);
+    return this.digitalTwinService.getStudentTwin(studentId, classroomId, user.sub, user.role);
   }
 }

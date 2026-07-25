@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { PaginationDto } from '@minedu/common';
+import { PaginationDto, Role } from '@minedu/common';
 
 const PRESENT_STATUSES = ['PRESENT', 'LATE'];
 
@@ -161,13 +161,31 @@ export class IndicatorsService {
     return { items, total, page: pagination.page, limit: pagination.limit };
   }
 
-  async findByStudentAndClassroom(studentId: string, classroomId: string) {
+  private async ensureFamiliarAccess(studentId: string, userId: string) {
+    const { data: students } = await firstValueFrom(
+      this.http.get<{ id: string }[]>(
+        `${this.classroomUrl}/internal/students/familiar/${userId}`,
+        { headers: { 'x-internal-key': this.internalKey } },
+      ),
+    );
+    if (!students.some((s) => s.id === studentId)) {
+      throw new ForbiddenException('No tienes acceso a este estudiante');
+    }
+  }
+
+  async findByStudentAndClassroom(studentId: string, classroomId: string, userId?: string, userRole?: Role) {
+    if (userRole === Role.FAMILIAR && userId) {
+      await this.ensureFamiliarAccess(studentId, userId);
+    }
     return this.prisma.studentIndicator.findUnique({
       where: { studentId_classroomId: { studentId, classroomId } },
     });
   }
 
-  async findByStudent(studentId: string, pagination: PaginationDto) {
+  async findByStudent(studentId: string, pagination: PaginationDto, userId?: string, userRole?: Role) {
+    if (userRole === Role.FAMILIAR && userId) {
+      await this.ensureFamiliarAccess(studentId, userId);
+    }
     const [items, total] = await Promise.all([
       this.prisma.studentIndicator.findMany({
         where: { studentId },

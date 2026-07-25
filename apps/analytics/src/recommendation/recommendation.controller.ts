@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard, RolesGuard, Roles, Role, PaginationDto } from '@minedu/common';
+import { JwtAuthGuard, RolesGuard, Roles, Role, PaginationDto, CurrentUser, JwtPayload } from '@minedu/common';
 import { RecommendationService } from './recommendation.service';
 
 @Controller('recommendations')
@@ -15,13 +15,17 @@ export class RecommendationController {
 
   @Get('student/:studentId')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
-  findByStudent(@Param('studentId') studentId: string, @Query() pagination: PaginationDto) {
-    return this.recommendationService.findByStudent(studentId, pagination);
+  findByStudent(
+    @Param('studentId') studentId: string,
+    @Query() pagination: PaginationDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.recommendationService.findByStudent(studentId, pagination, user.sub, user.role);
   }
 
   @Patch(':id/dismiss')
   @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  dismiss(@Param('id') id: string) {
-    return this.recommendationService.dismiss(id);
+  dismiss(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.recommendationService.dismiss(id, user.sub, user.role);
   }
 }

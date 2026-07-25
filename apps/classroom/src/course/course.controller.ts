@@ -16,15 +16,15 @@ export class CourseController {
   }
 
   @Get()
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  findAll() {
-    return this.courseService.findAll();
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
+  findAll(@CurrentUser() user: JwtPayload) {
+    return this.courseService.findAll(user.sub, user.role);
   }
 
   @Get(':id')
-  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO)
-  findOne(@Param('id') id: string) {
-    return this.courseService.findOne(id);
+  @Roles(Role.DOCENTE, Role.ADMIN, Role.DIRECTIVO, Role.FAMILIAR)
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.courseService.findOne(id, user.sub, user.role);
   }
 
   @Patch(':id')
