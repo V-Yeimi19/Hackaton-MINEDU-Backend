@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-minedu}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-minedu}
       POSTGRES_DB: ${POSTGRES_USER:-minedu}
-      POSTGRES_MULTIPLE_DATABASES: auth_db,users_db,storage_db,notifications_db,reports_db,classroom_db,analytics_db,ai_db,accessibility_db
+      POSTGRES_MULTIPLE_DATABASES: auth_db,users_db,storage_db,notifications_db,reports_db,classroom_db,analytics_db,ai_db,accessibility_db,dashboard_db
     ports:
       - '5432:5432'
     volumes:
@@ -65,6 +65,7 @@ services:
       ANALYTICS_SERVICE_URL: http://analytics:3007
       AI_SERVICE_URL: http://ai:3008
       ACCESSIBILITY_SERVICE_URL: http://accessibility:3009
+      DASHBOARD_SERVICE_URL: http://dashboard:3010
     ports:
       - '3000:3000'
     depends_on:
@@ -77,6 +78,7 @@ services:
       - analytics
       - ai
       - accessibility
+      - dashboard
 
   auth:
     build:
@@ -271,6 +273,27 @@ services:
       REDIS_URL: redis://redis:6379
     ports:
       - '3009:3009'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+    restart: unless-stopped
+    environment:
+      DASHBOARD_PORT: 3010
+      DATABASE_URL: postgresql://${POSTGRES_USER:-minedu}:${POSTGRES_PASSWORD:-minedu}@postgres:5432/dashboard_db
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      CLASSROOM_SERVICE_INTERNAL_URL: http://classroom:3006
+      ANALYTICS_SERVICE_INTERNAL_URL: http://analytics:3007
+      REDIS_URL: redis://redis:6379
+    ports:
+      - '3010:3010'
     depends_on:
       postgres:
         condition: service_healthy

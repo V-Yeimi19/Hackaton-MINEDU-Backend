@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  SERVICES: "auth users storage notifications reports classroom analytics ai accessibility gateway"
-  PRISMA_SERVICES: "auth users storage notifications reports classroom analytics ai accessibility"
+  SERVICES: "auth users storage notifications reports classroom analytics ai accessibility dashboard gateway"
+  PRISMA_SERVICES: "auth users storage notifications reports classroom analytics ai accessibility dashboard"
 
 jobs:
   build:

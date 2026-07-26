@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SnapshotScope {
+  NATIONAL
+  INSTITUTION
+}
+
+// Serie historica de métricas ya agregadas (Classroom/Analytics solo guardan
+// el último valor calculado) — la escribe el cron diario en ScheduleService.
+model MetricSnapshot {
+  id         String        @id @default(uuid())
+  scope      SnapshotScope
+  scopeId    String? // null para NATIONAL, institutionId para INSTITUTION
+  metric     String // "avgAttendanceRate" | "avgGrade" | "totalStudents" | "activeInstitutions"
+  value      Float
+  capturedAt DateTime      @default(now())
+
+  @@index([scope, scopeId, metric, capturedAt])
+}
+
+// Avance curricular por curso — dominio nuevo, no existe en Classroom.
+// El docente actualiza totalUnits/completedUnits manualmente.
+model CourseProgress {
+  id             String   @id @default(uuid())
+  courseId       String   @unique
+  totalUnits     Int      @default(0)
+  completedUnits Int      @default(0)
+  updatedAt      DateTime @updatedAt
+}
+
+enum IncidentSeverity {
+  LEVE
+  MODERADO
+  GRAVE
+}
+
+// Incidencias disciplinarias por estudiante — dominio nuevo, no existe en
+// Classroom. Los "créditos" NO se persisten aquí: se derivan en caliente
+// contando StudentCompetency con level=LOGRADO vía Classroom internal API.
+model StudentIncident {
+  id           String           @id @default(uuid())
+  studentId    String
+  type         String
+  description  String?
+  severity     IncidentSeverity @default(LEVE)
+  registeredBy String
+  createdAt    DateTime         @default(now())
+
+  @@index([studentId])
+}

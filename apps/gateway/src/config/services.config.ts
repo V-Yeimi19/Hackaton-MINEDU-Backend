@@ -14,4 +14,5 @@ export const serviceRoutes: ServiceRoute[] = [
   { prefix: 'analytics', envKey: 'ANALYTICS_SERVICE_URL' },
   { prefix: 'ai', envKey: 'AI_SERVICE_URL' },
   { prefix: 'accessibility', envKey: 'ACCESSIBILITY_SERVICE_URL' },
+  { prefix: 'dashboard', envKey: 'DASHBOARD_SERVICE_URL' },
 ];

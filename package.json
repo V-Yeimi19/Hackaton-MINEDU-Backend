@@ -15,6 +15,7 @@
     "dev:analytics": "pnpm --filter analytics start:dev",
     "dev:ai": "pnpm --filter ai start:dev",
     "dev:accessibility": "pnpm --filter accessibility start:dev",
+    "dev:dashboard": "pnpm --filter dashboard start:dev",
     "build": "pnpm -r build",
     "test": "jest --config jest.config.ts",
     "test:integration": "jest --config jest.config.ts --testPathPattern=integration",

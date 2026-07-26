@@ -13,4 +13,5 @@ export const envValidationSchema = Joi.object({
   ANALYTICS_SERVICE_URL: Joi.string().uri().optional(),
   AI_SERVICE_URL: Joi.string().uri().optional(),
   ACCESSIBILITY_SERVICE_URL: Joi.string().uri().optional(),
+  DASHBOARD_SERVICE_URL: Joi.string().uri().optional(),
 });

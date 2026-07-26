@@ -63,4 +63,32 @@ export class InternalController {
       where: { familiarId },
     });
   }
+
+  @Get('students')
+  getAllStudents() {
+    return this.prisma.student.findMany();
+  }
+
+  @Get('institutions')
+  getAllInstitutions() {
+    return this.prisma.institution.findMany({
+      include: { classrooms: true, teachers: true },
+    });
+  }
+
+  @Get('institutions/director/:directorId')
+  getInstitutionsByDirector(@Param('directorId') directorId: string) {
+    return this.prisma.institution.findMany({
+      where: { directorId },
+      include: { classrooms: true, teachers: true },
+    });
+  }
+
+  @Get('competencies/student/:studentId')
+  getCompetenciesByStudent(@Param('studentId') studentId: string) {
+    return this.prisma.studentCompetency.findMany({
+      where: { studentId },
+      include: { competency: true },
+    });
+  }
 }
