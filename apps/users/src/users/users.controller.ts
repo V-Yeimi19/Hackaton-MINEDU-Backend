@@ -42,6 +42,12 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('me')
+  me(@CurrentUser() currentUser: JwtPayload) {
+    return this.usersService.findByAuthUserId(currentUser.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   async findOne(@Param('id') id: string, @CurrentUser() currentUser: JwtPayload) {
     const user = await this.usersService.findOne(id);
