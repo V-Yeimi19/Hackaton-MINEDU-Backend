@@ -48,18 +48,16 @@ export class CompetencyService {
         courseId: dto.courseId,
         level: dto.level,
       },
+      include: { competency: true },
     });
     try {
       const course = await this.prisma.course.findUnique({
         where: { id: dto.courseId },
       });
-      const competency = await this.prisma.competency.findUnique({
-        where: { id: dto.competencyId },
-      });
       await this.pubsub.publish(EVENTS.COMPETENCY_EVALUATED, {
         ...evaluation,
         classroomId: course?.classroomId,
-        competencyName: competency?.name,
+        competencyName: evaluation.competency.name,
       });
     } catch (err) {
       this.logger.warn('Fallo publicando evento COMPETENCY_EVALUATED', err);

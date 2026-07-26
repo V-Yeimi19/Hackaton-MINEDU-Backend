@@ -29,14 +29,12 @@ export class GradeService {
         evaluation: dto.evaluation,
         score: dto.score,
       },
+      include: { course: true },
     });
     try {
-      const course = await this.prisma.course.findUnique({
-        where: { id: dto.courseId },
-      });
       await this.pubsub.publish(EVENTS.GRADE_REGISTERED, {
         ...grade,
-        classroomId: course?.classroomId,
+        classroomId: grade.course.classroomId,
       });
     } catch (err) {
       this.logger.warn('Fallo publicando evento GRADE_REGISTERED', err);
@@ -92,14 +90,15 @@ export class GradeService {
         throw new ForbiddenException('No tienes permiso para editar esta calificación');
       }
     }
-    const updated = await this.prisma.grade.update({ where: { id }, data: dto });
+    const updated = await this.prisma.grade.update({
+      where: { id },
+      data: dto,
+      include: { course: true },
+    });
     try {
-      const course = await this.prisma.course.findUnique({
-        where: { id: updated.courseId },
-      });
       await this.pubsub.publish(EVENTS.GRADE_UPDATED, {
         ...updated,
-        classroomId: course?.classroomId,
+        classroomId: updated.course.classroomId,
       });
     } catch (err) {
       this.logger.warn('Fallo publicando evento GRADE_UPDATED', err);
