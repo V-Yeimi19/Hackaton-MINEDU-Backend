@@ -3,7 +3,10 @@ import { JwtAuthGuard, RolesGuard, Roles, Role, CurrentUser, JwtPayload } from '
 import { AggregationService } from './aggregation.service';
 import { TrendsQueryDto } from './dto/trends-query.dto';
 
-@Controller('dashboard')
+// Sin prefijo 'dashboard': el Gateway ya recorta /api/dashboard antes de
+// reenviar (igual que analytics/classroom/etc. con su propio prefijo),
+// repetirlo aquí duplicaría el segmento y rompería el ruteo (404).
+@Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AggregationController {
   constructor(private readonly aggregationService: AggregationService) {}

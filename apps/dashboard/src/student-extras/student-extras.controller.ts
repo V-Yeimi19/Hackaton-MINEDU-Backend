@@ -3,7 +3,9 @@ import { JwtAuthGuard, RolesGuard, Roles, Role, CurrentUser, JwtPayload } from '
 import { StudentExtrasService } from './student-extras.service';
 import { CreateIncidentDto } from './dto/create-incident.dto';
 
-@Controller('dashboard/student')
+// 'student', no 'dashboard/student': el Gateway ya recorta /api/dashboard
+// antes de reenviar — ver el mismo comentario en aggregation.controller.ts.
+@Controller('student')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class StudentExtrasController {
   constructor(private readonly studentExtrasService: StudentExtrasService) {}

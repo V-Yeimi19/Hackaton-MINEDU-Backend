@@ -3,7 +3,9 @@ import { JwtAuthGuard, RolesGuard, Roles, Role } from '@minedu/common';
 import { ProgressService } from './progress.service';
 import { UpdateCourseProgressDto } from './dto/update-course-progress.dto';
 
-@Controller('dashboard')
+// Sin prefijo 'dashboard': el Gateway ya recorta /api/dashboard antes de
+// reenviar — ver el mismo comentario en aggregation.controller.ts.
+@Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ProgressController {
   constructor(private readonly progressService: ProgressService) {}
