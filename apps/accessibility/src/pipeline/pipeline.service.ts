@@ -126,6 +126,9 @@ export class PipelineService {
       if (this.ocr.needsOcr(contentType)) {
         this.logger.log(`[${job.id}] Ejecutando OCR...`);
         originalText = await this.ocr.extractText(buffer, contentType);
+      } else if (this.ocr.isPdf(contentType)) {
+        this.logger.log(`[${job.id}] Extrayendo texto de PDF...`);
+        originalText = await this.ocr.extractPdfText(buffer);
       } else if (contentType.includes('text')) {
         originalText = buffer.toString('utf-8');
       } else {

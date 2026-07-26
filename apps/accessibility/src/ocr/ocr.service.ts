@@ -1,9 +1,29 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createWorker } from 'tesseract.js';
+import { PDFParse } from 'pdf-parse';
 
 @Injectable()
 export class OcrService {
   private readonly logger = new Logger(OcrService.name);
+
+  isPdf(mimeType: string): boolean {
+    return mimeType === 'application/pdf';
+  }
+
+  async extractPdfText(buffer: Buffer): Promise<string> {
+    this.logger.log('Extrayendo texto de PDF');
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const result = await parser.getText();
+      this.logger.log(`Extraccion de PDF completada: ${result.text.length} caracteres`);
+      return result.text;
+    } catch (err) {
+      this.logger.error('Error extrayendo texto de PDF', err);
+      throw new Error('Fallo en la extraccion de texto del PDF');
+    } finally {
+      await parser.destroy();
+    }
+  }
 
   async extractText(buffer: Buffer, mimeType: string): Promise<string> {
     this.logger.log(`Iniciando OCR para tipo: ${mimeType}`);
