@@ -45,10 +45,11 @@ export class SupportNeedService {
 
   async findByStudent(studentId: string, userId?: string, userRole?: string) {
     if (userRole === Role.FAMILIAR && userId) {
-      const enrollment = await this.prisma.enrollment.findFirst({
-        where: { studentId, familiarId: userId },
-      });
-      if (!enrollment) {
+      // Ownership real es Student.familiarId, no si ya tiene una matrícula —
+      // un estudiante recién registrado y aún sin aula debe poder verse (vacío),
+      // no recibir 403. Mismo criterio que assertOwnership() arriba.
+      const student = await this.prisma.student.findUnique({ where: { id: studentId } });
+      if (!student || student.familiarId !== userId) {
         throw new ForbiddenException('No tienes acceso a este estudiante');
       }
     }
